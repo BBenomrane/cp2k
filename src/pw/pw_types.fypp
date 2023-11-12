@@ -1,0 +1,22 @@
+#!-------------------------------------------------------------------------------------------------!
+#!   CP2K: A general program to perform molecular dynamics simulations                             !
+#!   Copyright 2000-2023 CP2K developers group <https://cp2k.org>                                  !
+#!                                                                                                 !
+#!   SPDX-License-Identifier: GPL-2.0-or-later                                                     !
+#!-------------------------------------------------------------------------------------------------!
+#:mute
+   #:set pw_kinds = ["r1d", "r3d", "c1d", "c3d"]
+   #:set pw_types = ["REAL(KIND=dp), DIMENSION(:)", "REAL(KIND=dp), DIMENSION(:, :, :)", "COMPLEX(KIND=dp), DIMENSION(:)", "COMPLEX(KIND=dp), DIMENSION(:, :, :)"]
+   #:set pw_spaces = ["rs", "gs"]
+#:endmute
+
+#:def type2type(data, kind1, kind2)
+   #:if kind1 == kind2 or kind1.split("(")[0] == "REAL"
+      ${data}$
+   #:else
+      REAL(${data}$, KIND=dp)
+   #:endif
+#:enddef
+
+#:set is_1D = lambda kind : kind[1]=="1"
+#:set is_3D = lambda kind : kind[1]=="3"
