@@ -58,7 +58,7 @@ MODULE pw_pool_types
 !> \brief Manages a pool of grids (to be used for example as tmp objects),
 !>      but can also be used to instantiate grids that are never given back.
 !> \param ref_count reference count (see /cp2k/doc/ReferenceCounting.html)
-!> \param real 1d_pw, complex1d_pw, complex3d_pw: liked list with
+!> \param real 1d_pw, c1d_pw, complex3d_pw: liked list with
 !>        the cached grids of the corresponding type
 !> \note
 !>      As of now I would like replace the linked lists by arrays
@@ -71,10 +71,10 @@ MODULE pw_pool_types
    TYPE pw_pool_type
       INTEGER :: ref_count = 0, max_cache = 0
       TYPE(pw_grid_type), POINTER :: pw_grid => NULL()
-      TYPE(cp_sll_pw_type), POINTER :: real1d_pw => NULL(), &
-                                       complex1d_pw => NULL()
-      TYPE(cp_sll_3d_r_type), POINTER :: real3d_array => NULL()
-      TYPE(cp_sll_3d_c_type), POINTER :: complex3d_array => NULL()
+      TYPE(cp_sll_pw_type), POINTER :: r1d_pw => NULL(), &
+                                       c1d_pw => NULL()
+      TYPE(cp_sll_3d_r_type), POINTER :: r3d_array => NULL()
+      TYPE(cp_sll_3d_c_type), POINTER :: c3d_array => NULL()
    CONTAINS
       PROCEDURE, PUBLIC, NON_OVERRIDABLE :: retain => pw_pool_retain
       PROCEDURE, PUBLIC, NON_OVERRIDABLE :: create_pw => pw_pool_create_pw
@@ -117,8 +117,8 @@ CONTAINS
       pool%max_cache = default_max_cache
       IF (PRESENT(max_cache)) pool%max_cache = max_cache
       pool%max_cache = MIN(max_max_cache, pool%max_cache)
-      NULLIFY (pool%real1d_pw, &
-               pool%complex1d_pw, pool%complex3d_array, pool%real3d_array)
+      NULLIFY (pool%r1d_pw, &
+               pool%c1d_pw, pool%c3d_array, pool%r3d_array)
    END SUBROUTINE pw_pool_create
 
 ! **************************************************************************************************
@@ -156,35 +156,35 @@ CONTAINS
       TYPE(pw_type), POINTER                             :: pw_el
 
       NULLIFY (iterator, r3d_iterator, pw_el, r3d_att)
-      iterator => pool%real1d_pw
+      iterator => pool%r1d_pw
       DO
          IF (.NOT. cp_sll_pw_next(iterator, el_att=pw_el)) EXIT
          CALL pw_el%release()
          DEALLOCATE (pw_el)
       END DO
-      CALL cp_sll_pw_dealloc(pool%real1d_pw)
+      CALL cp_sll_pw_dealloc(pool%r1d_pw)
 
-      iterator => pool%complex1d_pw
+      iterator => pool%c1d_pw
       DO
          IF (.NOT. cp_sll_pw_next(iterator, el_att=pw_el)) EXIT
          CALL pw_el%release()
          DEALLOCATE (pw_el)
       END DO
-      CALL cp_sll_pw_dealloc(pool%complex1d_pw)
+      CALL cp_sll_pw_dealloc(pool%c1d_pw)
 
-      r3d_iterator => pool%real3d_array
+      r3d_iterator => pool%r3d_array
       DO
          IF (.NOT. cp_sll_3d_r_next(r3d_iterator, el_att=r3d_att)) EXIT
          DEALLOCATE (r3d_att)
       END DO
-      CALL cp_sll_3d_r_dealloc(pool%real3d_array)
+      CALL cp_sll_3d_r_dealloc(pool%r3d_array)
 
-      c3d_iterator => pool%complex3d_array
+      c3d_iterator => pool%c3d_array
       DO
          IF (.NOT. cp_sll_3d_c_next(c3d_iterator, el_att=c3d_att)) EXIT
          DEALLOCATE (c3d_att)
       END DO
-      CALL cp_sll_3d_c_dealloc(pool%complex3d_array)
+      CALL cp_sll_3d_c_dealloc(pool%c3d_array)
 
    END SUBROUTINE pw_pool_flush_cache
 
@@ -299,34 +299,34 @@ CONTAINS
 
       INTEGER                                            :: handle
       REAL(kind=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         POINTER                                         :: cr3d_ptr
+         POINTER                                         :: r3d_ptr
       COMPLEX(kind=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         POINTER                                         :: cc3d_ptr
+         POINTER                                         :: c3d_ptr
       TYPE(pw_type), POINTER                             :: el
 
       CALL timeset(routineN, handle)
-      NULLIFY (cr3d_ptr, cc3d_ptr, el)
+      NULLIFY (r3d_ptr, c3d_ptr, el)
 
       SELECT CASE (use_data)
       CASE (REALDATA1D)
-         el => try_pop(pool%real1d_pw)
+         el => try_pop(pool%r1d_pw)
       CASE (REALDATA3D)
-         cr3d_ptr => try_pop_r3d(pool%real3d_array)
+         r3d_ptr => try_pop_r3d(pool%r3d_array)
       CASE (COMPLEXDATA1D)
-         el => try_pop(pool%complex1d_pw)
+         el => try_pop(pool%c1d_pw)
       CASE (COMPLEXDATA3D)
-         cc3d_ptr => try_pop_c3d(pool%complex3d_array)
+         c3d_ptr => try_pop_c3d(pool%c3d_array)
       CASE default
 ! unknown use_data
          CPABORT("")
       END SELECT
 
-      IF (ASSOCIATED(cr3d_ptr)) THEN
+      IF (ASSOCIATED(r3d_ptr)) THEN
          CALL pw%create(pool%pw_grid, use_data=use_data, &
-                        in_space=in_space, cr3d_ptr=cr3d_ptr)
-      ELSE IF (ASSOCIATED(cc3d_ptr)) THEN
+                        in_space=in_space, r3d_ptr=r3d_ptr)
+      ELSE IF (ASSOCIATED(c3d_ptr)) THEN
          CALL pw%create(pool%pw_grid, use_data=use_data, &
-                        in_space=in_space, cc3d_ptr=cc3d_ptr)
+                        in_space=in_space, c3d_ptr=c3d_ptr)
       ELSE IF (.NOT. ASSOCIATED(el)) THEN
          CALL pw%create(pool%pw_grid, use_data=use_data, &
                         in_space=in_space)
@@ -370,8 +370,8 @@ CONTAINS
 
             SELECT CASE (el%in_use)
             CASE (REALDATA1D)
-               IF (cp_sll_pw_get_length(pool%real1d_pw) < pool%max_cache) THEN
-                  CALL cp_sll_pw_insert_el(pool%real1d_pw, el=el)
+               IF (cp_sll_pw_get_length(pool%r1d_pw) < pool%max_cache) THEN
+                  CALL cp_sll_pw_insert_el(pool%r1d_pw, el=el)
                ELSE
                   IF (max_max_cache >= 0) &
                      CPWARN("hit max_cache")
@@ -380,8 +380,8 @@ CONTAINS
                END IF
             CASE (REALDATA3D)
                IF (ASSOCIATED(el%cr3d)) THEN
-                  IF (cp_sll_3d_r_get_length(pool%real3d_array) < pool%max_cache) THEN
-                     CALL cp_sll_3d_r_insert_el(pool%real3d_array, el=el%cr3d)
+                  IF (cp_sll_3d_r_get_length(pool%r3d_array) < pool%max_cache) THEN
+                     CALL cp_sll_3d_r_insert_el(pool%r3d_array, el=el%cr3d)
                      NULLIFY (el%cr3d)
                   ELSE IF (max_max_cache >= 0) THEN
                      CPWARN("hit max_cache")
@@ -390,8 +390,8 @@ CONTAINS
                CALL el%release()
                DEALLOCATE (el)
             CASE (COMPLEXDATA1D)
-               IF (cp_sll_pw_get_length(pool%complex1d_pw) < pool%max_cache) THEN
-                  CALL cp_sll_pw_insert_el(pool%complex1d_pw, el=el)
+               IF (cp_sll_pw_get_length(pool%c1d_pw) < pool%max_cache) THEN
+                  CALL cp_sll_pw_insert_el(pool%c1d_pw, el=el)
                ELSE
                   IF (max_max_cache >= 0) &
                      CPWARN("hit max_cache")
@@ -400,8 +400,8 @@ CONTAINS
                END IF
             CASE (COMPLEXDATA3D)
                IF (ASSOCIATED(el%cc3d)) THEN
-                  IF (cp_sll_3d_c_get_length(pool%complex3d_array) < pool%max_cache) THEN
-                     CALL cp_sll_3d_c_insert_el(pool%complex3d_array, el=el%cc3d)
+                  IF (cp_sll_3d_c_get_length(pool%c3d_array) < pool%max_cache) THEN
+                     CALL cp_sll_3d_c_insert_el(pool%c3d_array, el=el%cc3d)
                      NULLIFY (el%cc3d)
                   ELSE IF (max_max_cache >= 0) THEN
                      CPWARN("hit max_cache")
@@ -442,9 +442,9 @@ CONTAINS
       TYPE(pw_type), POINTER                             :: pw
 
       NULLIFY (pw)
-      IF (ASSOCIATED(pw_pool%real3d_array)) THEN
-         cr3d => cp_sll_3d_r_get_first_el(pw_pool%real3d_array)
-         CALL cp_sll_3d_r_rm_first_el(pw_pool%real3d_array)
+      IF (ASSOCIATED(pw_pool%r3d_array)) THEN
+         cr3d => cp_sll_3d_r_get_first_el(pw_pool%r3d_array)
+         CALL cp_sll_3d_r_rm_first_el(pw_pool%r3d_array)
       END IF
       IF (.NOT. ASSOCIATED(cr3d)) THEN
          ALLOCATE (cr3d(pw_pool%pw_grid%bounds_local(1, 1):pw_pool%pw_grid%bounds_local(2, 1), &
@@ -475,8 +475,8 @@ CONTAINS
                                 pw_pool%pw_grid%bounds_local(2, :) < pw_pool%pw_grid%bounds_local(1, :), &
                                 UBOUND(cr3d) >= LBOUND(cr3d)))
          IF (compatible) THEN
-            IF (cp_sll_3d_r_get_length(pw_pool%real3d_array) < pw_pool%max_cache) THEN
-               CALL cp_sll_3d_r_insert_el(pw_pool%real3d_array, el=cr3d)
+            IF (cp_sll_3d_r_get_length(pw_pool%r3d_array) < pw_pool%max_cache) THEN
+               CALL cp_sll_3d_r_insert_el(pw_pool%r3d_array, el=cr3d)
             ELSE
                IF (max_max_cache >= 0) &
                   CPWARN("hit max_cache")

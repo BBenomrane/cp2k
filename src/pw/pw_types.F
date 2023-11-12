@@ -135,20 +135,20 @@ CONTAINS
 !> \param pw_grid ...
 !> \param use_data which kind of data will be used
 !> \param in_space in which space the pw is (real or reciprocal)
-!> \param cr3d_ptr pointer with the cr3d data (make sense only if
+!> \param r3d_ptr pointer with the cr3d data (make sense only if
 !>        use_data==REALDATA3D)
 !> \par History
 !>      11.2003 created [fawzi]
 !> \author fawzi
 ! **************************************************************************************************
-   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, cr3d_ptr, cc3d_ptr)
+   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, r3d_ptr, c3d_ptr)
       CLASS(pw_type), INTENT(INOUT)                         :: pw
       TYPE(pw_grid_type), INTENT(IN), POINTER            :: pw_grid
       INTEGER, INTENT(in)                                :: use_data, in_space
       REAL(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         INTENT(IN), OPTIONAL, POINTER                   :: cr3d_ptr
+         INTENT(IN), OPTIONAL, POINTER                   :: r3d_ptr
       COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         INTENT(IN), OPTIONAL, POINTER                   :: cc3d_ptr
+         INTENT(IN), OPTIONAL, POINTER                   :: c3d_ptr
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_create'
 
@@ -160,8 +160,8 @@ CONTAINS
       logger => cp_get_default_logger()
       IF (debug_this_module) THEN
          WRITE (cp_logger_get_default_unit_nr(logger), "('*** allocated pw ***')")
-         IF (PRESENT(cr3d_ptr)) THEN
-            IF (ASSOCIATED(cr3d_ptr)) THEN
+         IF (PRESENT(r3d_ptr)) THEN
+            IF (ASSOCIATED(r3d_ptr)) THEN
                WRITE (cp_logger_get_default_unit_nr(logger), "('*** cr3d associated ***')")
             END IF
          END IF
@@ -171,14 +171,14 @@ CONTAINS
       IF (in_space /= REALSPACE .AND. in_space /= RECIPROCALSPACE) &
          CPABORT("Choose a proper space in which the grid lives!")
 
-      IF (PRESENT(cr3d_ptr)) THEN
-         IF (ASSOCIATED(cr3d_ptr)) THEN
+      IF (PRESENT(r3d_ptr)) THEN
+         IF (ASSOCIATED(r3d_ptr)) THEN
             CPASSERT(use_data == REALDATA3D)
          END IF
       END IF
 
-      IF (PRESENT(cc3d_ptr)) THEN
-         IF (ASSOCIATED(cc3d_ptr)) THEN
+      IF (PRESENT(c3d_ptr)) THEN
+         IF (ASSOCIATED(c3d_ptr)) THEN
             CPASSERT(use_data == COMPLEXDATA3D)
          END IF
       END IF
@@ -199,13 +199,13 @@ CONTAINS
          ALLOCATE (pw%cc(pw%pw_grid%ngpts_cut_local))
 
       CASE (REALDATA3D)
-         IF (PRESENT(cr3d_ptr)) THEN
-            IF (ASSOCIATED(cr3d_ptr)) THEN
+         IF (PRESENT(r3d_ptr)) THEN
+            IF (ASSOCIATED(r3d_ptr)) THEN
                IF (ALL(bounds(1, :) <= bounds(2, :))) THEN
-                  CPASSERT(ALL(LBOUND(cr3d_ptr) == bounds(1, :)))
-                  CPASSERT(ALL(UBOUND(cr3d_ptr) == bounds(2, :)))
+                  CPASSERT(ALL(LBOUND(r3d_ptr) == bounds(1, :)))
+                  CPASSERT(ALL(UBOUND(r3d_ptr) == bounds(2, :)))
                END IF
-               pw%cr3d => cr3d_ptr
+               pw%cr3d => r3d_ptr
             END IF
          END IF
          IF (.NOT. ASSOCIATED(pw%cr3d)) THEN
@@ -216,13 +216,13 @@ CONTAINS
          END IF
 
       CASE (COMPLEXDATA3D)
-         IF (PRESENT(cc3d_ptr)) THEN
-            IF (ASSOCIATED(cc3d_ptr)) THEN
+         IF (PRESENT(c3d_ptr)) THEN
+            IF (ASSOCIATED(c3d_ptr)) THEN
                IF (ALL(bounds(1, :) <= bounds(2, :))) THEN
-                  CPASSERT(ALL(LBOUND(cc3d_ptr) == bounds(1, :)))
-                  CPASSERT(ALL(UBOUND(cc3d_ptr) == bounds(2, :)))
+                  CPASSERT(ALL(LBOUND(c3d_ptr) == bounds(1, :)))
+                  CPASSERT(ALL(UBOUND(c3d_ptr) == bounds(2, :)))
                END IF
-               pw%cc3d => cc3d_ptr
+               pw%cc3d => c3d_ptr
             END IF
          END IF
          IF (.NOT. ASSOCIATED(pw%cc3d)) THEN
@@ -263,7 +263,7 @@ CONTAINS
 !> \param pw_grid ...
 !> \param use_data which kind of data will be used
 !> \param in_space in which space the pw is (real or reciprocal)
-!> \param cr3d_ptr pointer with the cr3d data (make sense only if
+!> \param array_ptr pointer with the cr3d data (make sense only if
 !>        use_data==REALDATA3D)
 !> \par History
 !>      11.2003 created [fawzi]
