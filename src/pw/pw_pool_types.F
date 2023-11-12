@@ -23,6 +23,8 @@
 ! **************************************************************************************************
 MODULE pw_pool_types
    USE cp_linked_list_pw,               ONLY: &
+        cp_sll_3d_c_dealloc, cp_sll_3d_c_get_first_el, cp_sll_3d_c_get_length, &
+        cp_sll_3d_c_insert_el, cp_sll_3d_c_next, cp_sll_3d_c_rm_first_el, cp_sll_3d_c_type, &
         cp_sll_3d_r_dealloc, cp_sll_3d_r_get_first_el, cp_sll_3d_r_get_length, &
         cp_sll_3d_r_insert_el, cp_sll_3d_r_next, cp_sll_3d_r_rm_first_el, cp_sll_3d_r_type, &
         cp_sll_pw_dealloc, cp_sll_pw_get_first_el, cp_sll_pw_get_length, cp_sll_pw_insert_el, &
@@ -70,8 +72,9 @@ MODULE pw_pool_types
       INTEGER :: ref_count = 0, max_cache = 0
       TYPE(pw_grid_type), POINTER :: pw_grid => NULL()
       TYPE(cp_sll_pw_type), POINTER :: real1d_pw => NULL(), &
-                                       complex1d_pw => NULL(), complex3d_pw => NULL()
+                                       complex1d_pw => NULL()
       TYPE(cp_sll_3d_r_type), POINTER :: real3d_array => NULL()
+      TYPE(cp_sll_3d_c_type), POINTER :: complex3d_array => NULL()
    CONTAINS
       PROCEDURE, PUBLIC, NON_OVERRIDABLE :: retain => pw_pool_retain
       PROCEDURE, PUBLIC, NON_OVERRIDABLE :: create_pw => pw_pool_create_pw
@@ -115,7 +118,7 @@ CONTAINS
       IF (PRESENT(max_cache)) pool%max_cache = max_cache
       pool%max_cache = MIN(max_max_cache, pool%max_cache)
       NULLIFY (pool%real1d_pw, &
-               pool%complex1d_pw, pool%complex3d_pw, pool%real3d_array)
+               pool%complex1d_pw, pool%complex3d_array, pool%real3d_array)
    END SUBROUTINE pw_pool_create
 
 ! **************************************************************************************************
@@ -143,13 +146,16 @@ CONTAINS
    SUBROUTINE pw_pool_flush_cache(pool)
       TYPE(pw_pool_type), INTENT(INOUT)                  :: pool
 
+      COMPLEX(kind=dp), CONTIGUOUS, DIMENSION(:, :, :), &
+         POINTER                                         :: c3d_att
       REAL(kind=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         POINTER                                         :: array_att
-      TYPE(cp_sll_3d_r_type), POINTER                    :: array_iterator
+         POINTER                                         :: r3d_att
+      TYPE(cp_sll_3d_c_type), POINTER                    :: c3d_iterator
+      TYPE(cp_sll_3d_r_type), POINTER                    :: r3d_iterator
       TYPE(cp_sll_pw_type), POINTER                      :: iterator
       TYPE(pw_type), POINTER                             :: pw_el
 
-      NULLIFY (iterator, array_iterator, pw_el, array_att)
+      NULLIFY (iterator, r3d_iterator, pw_el, r3d_att)
       iterator => pool%real1d_pw
       DO
          IF (.NOT. cp_sll_pw_next(iterator, el_att=pw_el)) EXIT
@@ -166,20 +172,19 @@ CONTAINS
       END DO
       CALL cp_sll_pw_dealloc(pool%complex1d_pw)
 
-      iterator => pool%complex3d_pw
+      r3d_iterator => pool%real3d_array
       DO
-         IF (.NOT. cp_sll_pw_next(iterator, el_att=pw_el)) EXIT
-         CALL pw_el%release()
-         DEALLOCATE (pw_el)
-      END DO
-      CALL cp_sll_pw_dealloc(pool%complex3d_pw)
-
-      array_iterator => pool%real3d_array
-      DO
-         IF (.NOT. cp_sll_3d_r_next(array_iterator, el_att=array_att)) EXIT
-         DEALLOCATE (array_att)
+         IF (.NOT. cp_sll_3d_r_next(r3d_iterator, el_att=r3d_att)) EXIT
+         DEALLOCATE (r3d_att)
       END DO
       CALL cp_sll_3d_r_dealloc(pool%real3d_array)
+
+      c3d_iterator => pool%complex3d_array
+      DO
+         IF (.NOT. cp_sll_3d_c_next(c3d_iterator, el_att=c3d_att)) EXIT
+         DEALLOCATE (c3d_att)
+      END DO
+      CALL cp_sll_3d_c_dealloc(pool%complex3d_array)
 
    END SUBROUTINE pw_pool_flush_cache
 
@@ -252,6 +257,29 @@ CONTAINS
    END FUNCTION try_pop_r3d
 
 ! **************************************************************************************************
+!> \brief tries to pop an element from the given list (no error on failure)
+!> \param list the list to pop
+!> \return ...
+!> \par History
+!>      08.2002 created [fawzi]
+!> \author Fawzi Mohamed
+!> \note
+!>      private function
+! **************************************************************************************************
+   FUNCTION try_pop_c3d(list) RESULT(res)
+      TYPE(cp_sll_3d_c_type), POINTER                    :: list
+      COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
+         POINTER                                         :: res
+
+      IF (ASSOCIATED(list)) THEN
+         res => cp_sll_3d_c_get_first_el(list)
+         CALL cp_sll_3d_c_rm_first_el(list)
+      ELSE
+         NULLIFY (res)
+      END IF
+   END FUNCTION try_pop_c3d
+
+! **************************************************************************************************
 !> \brief returns a pw, allocating it if none is in the pool
 !> \param pool the pool from where you get the pw
 !> \param pw will contain the new pw
@@ -272,10 +300,12 @@ CONTAINS
       INTEGER                                            :: handle
       REAL(kind=dp), CONTIGUOUS, DIMENSION(:, :, :), &
          POINTER                                         :: cr3d_ptr
+      COMPLEX(kind=dp), CONTIGUOUS, DIMENSION(:, :, :), &
+         POINTER                                         :: cc3d_ptr
       TYPE(pw_type), POINTER                             :: el
 
       CALL timeset(routineN, handle)
-      NULLIFY (cr3d_ptr, el)
+      NULLIFY (cr3d_ptr, cc3d_ptr, el)
 
       SELECT CASE (use_data)
       CASE (REALDATA1D)
@@ -285,7 +315,7 @@ CONTAINS
       CASE (COMPLEXDATA1D)
          el => try_pop(pool%complex1d_pw)
       CASE (COMPLEXDATA3D)
-         el => try_pop(pool%complex3d_pw)
+         cc3d_ptr => try_pop_c3d(pool%complex3d_array)
       CASE default
 ! unknown use_data
          CPABORT("")
@@ -294,6 +324,9 @@ CONTAINS
       IF (ASSOCIATED(cr3d_ptr)) THEN
          CALL pw%create(pool%pw_grid, use_data=use_data, &
                         in_space=in_space, cr3d_ptr=cr3d_ptr)
+      ELSE IF (ASSOCIATED(cc3d_ptr)) THEN
+         CALL pw%create(pool%pw_grid, use_data=use_data, &
+                        in_space=in_space, cc3d_ptr=cc3d_ptr)
       ELSE IF (.NOT. ASSOCIATED(el)) THEN
          CALL pw%create(pool%pw_grid, use_data=use_data, &
                         in_space=in_space)
@@ -350,9 +383,8 @@ CONTAINS
                   IF (cp_sll_3d_r_get_length(pool%real3d_array) < pool%max_cache) THEN
                      CALL cp_sll_3d_r_insert_el(pool%real3d_array, el=el%cr3d)
                      NULLIFY (el%cr3d)
-                  ELSE
-                     IF (max_max_cache >= 0) &
-                        CPWARN("hit max_cache")
+                  ELSE IF (max_max_cache >= 0) THEN
+                     CPWARN("hit max_cache")
                   END IF
                END IF
                CALL el%release()
@@ -367,14 +399,16 @@ CONTAINS
                   DEALLOCATE (el)
                END IF
             CASE (COMPLEXDATA3D)
-               IF (cp_sll_pw_get_length(pool%complex3d_pw) < pool%max_cache) THEN
-                  CALL cp_sll_pw_insert_el(pool%complex3d_pw, el=el)
-               ELSE
-                  IF (max_max_cache >= 0) &
+               IF (ASSOCIATED(el%cc3d)) THEN
+                  IF (cp_sll_3d_c_get_length(pool%complex3d_array) < pool%max_cache) THEN
+                     CALL cp_sll_3d_c_insert_el(pool%complex3d_array, el=el%cc3d)
+                     NULLIFY (el%cc3d)
+                  ELSE IF (max_max_cache >= 0) THEN
                      CPWARN("hit max_cache")
-                  CALL el%release()
-                  DEALLOCATE (el)
+                  END IF
                END IF
+               CALL el%release()
+               DEALLOCATE (el)
             CASE default
                ! unknown in_use
                CPABORT("")
