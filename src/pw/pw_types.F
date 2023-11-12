@@ -141,12 +141,14 @@ CONTAINS
 !>      11.2003 created [fawzi]
 !> \author fawzi
 ! **************************************************************************************************
-   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, cr3d_ptr)
+   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, cr3d_ptr, cc3d_ptr)
       CLASS(pw_type), INTENT(INOUT)                         :: pw
       TYPE(pw_grid_type), INTENT(IN), POINTER            :: pw_grid
       INTEGER, INTENT(in)                                :: use_data, in_space
       REAL(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
          INTENT(IN), OPTIONAL, POINTER                   :: cr3d_ptr
+      COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
+         INTENT(IN), OPTIONAL, POINTER                   :: cc3d_ptr
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_create'
 
@@ -172,6 +174,12 @@ CONTAINS
       IF (PRESENT(cr3d_ptr)) THEN
          IF (ASSOCIATED(cr3d_ptr)) THEN
             CPASSERT(use_data == REALDATA3D)
+         END IF
+      END IF
+
+      IF (PRESENT(cc3d_ptr)) THEN
+         IF (ASSOCIATED(cc3d_ptr)) THEN
+            CPASSERT(use_data == COMPLEXDATA3D)
          END IF
       END IF
 
@@ -208,10 +216,21 @@ CONTAINS
          END IF
 
       CASE (COMPLEXDATA3D)
-         ALLOCATE (pw%cc3d( &
-                   bounds(1, 1):bounds(2, 1), &
-                   bounds(1, 2):bounds(2, 2), &
-                   bounds(1, 3):bounds(2, 3)))
+         IF (PRESENT(cc3d_ptr)) THEN
+            IF (ASSOCIATED(cc3d_ptr)) THEN
+               IF (ALL(bounds(1, :) <= bounds(2, :))) THEN
+                  CPASSERT(ALL(LBOUND(cc3d_ptr) == bounds(1, :)))
+                  CPASSERT(ALL(UBOUND(cc3d_ptr) == bounds(2, :)))
+               END IF
+               pw%cc3d => cc3d_ptr
+            END IF
+         END IF
+         IF (.NOT. ASSOCIATED(pw%cc3d)) THEN
+            ALLOCATE (pw%cc3d( &
+                      bounds(1, 1):bounds(2, 1), &
+                      bounds(1, 2):bounds(2, 2), &
+                      bounds(1, 3):bounds(2, 3)))
+         END IF
       CASE (NODATA)
          CPABORT("Choose a proper data type!")
       CASE default
