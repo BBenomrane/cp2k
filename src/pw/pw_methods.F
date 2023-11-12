@@ -165,6 +165,8 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
+      CPASSERT(pw1%in_space == pw2%in_space)
+
       out_unit = cp_logger_get_default_io_unit()
 
       IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
