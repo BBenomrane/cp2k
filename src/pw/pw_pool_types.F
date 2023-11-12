@@ -56,7 +56,7 @@ MODULE pw_pool_types
 !> \brief Manages a pool of grids (to be used for example as tmp objects),
 !>      but can also be used to instantiate grids that are never given back.
 !> \param ref_count reference count (see /cp2k/doc/ReferenceCounting.html)
-!> \param real 1d_pw, real3d_pw, complex1d_pw, complex3d_pw: liked list with
+!> \param real 1d_pw, complex1d_pw, complex3d_pw: liked list with
 !>        the cached grids of the corresponding type
 !> \note
 !>      As of now I would like replace the linked lists by arrays
@@ -69,7 +69,7 @@ MODULE pw_pool_types
    TYPE pw_pool_type
       INTEGER :: ref_count = 0, max_cache = 0
       TYPE(pw_grid_type), POINTER :: pw_grid => NULL()
-      TYPE(cp_sll_pw_type), POINTER :: real1d_pw => NULL(), real3d_pw => NULL(), &
+      TYPE(cp_sll_pw_type), POINTER :: real1d_pw => NULL(), &
                                        complex1d_pw => NULL(), complex3d_pw => NULL()
       TYPE(cp_sll_3d_r_type), POINTER :: real3d_array => NULL()
    CONTAINS
@@ -114,7 +114,7 @@ CONTAINS
       pool%max_cache = default_max_cache
       IF (PRESENT(max_cache)) pool%max_cache = max_cache
       pool%max_cache = MIN(max_max_cache, pool%max_cache)
-      NULLIFY (pool%real1d_pw, pool%real3d_pw, &
+      NULLIFY (pool%real1d_pw, &
                pool%complex1d_pw, pool%complex3d_pw, pool%real3d_array)
    END SUBROUTINE pw_pool_create
 
@@ -158,14 +158,6 @@ CONTAINS
       END DO
       CALL cp_sll_pw_dealloc(pool%real1d_pw)
 
-      iterator => pool%real3d_pw
-      DO
-         IF (.NOT. cp_sll_pw_next(iterator, el_att=pw_el)) EXIT
-         CALL pw_el%release()
-         DEALLOCATE (pw_el)
-      END DO
-      CALL cp_sll_pw_dealloc(pool%real3d_pw)
-
       iterator => pool%complex1d_pw
       DO
          IF (.NOT. cp_sll_pw_next(iterator, el_att=pw_el)) EXIT
@@ -184,8 +176,7 @@ CONTAINS
 
       array_iterator => pool%real3d_array
       DO
-         IF (.NOT. cp_sll_3d_r_next(array_iterator, el_att=array_att) &
-             ) EXIT
+         IF (.NOT. cp_sll_3d_r_next(array_iterator, el_att=array_att)) EXIT
          DEALLOCATE (array_att)
       END DO
       CALL cp_sll_3d_r_dealloc(pool%real3d_array)
@@ -238,6 +229,29 @@ CONTAINS
    END FUNCTION try_pop
 
 ! **************************************************************************************************
+!> \brief tries to pop an element from the given list (no error on failure)
+!> \param list the list to pop
+!> \return ...
+!> \par History
+!>      08.2002 created [fawzi]
+!> \author Fawzi Mohamed
+!> \note
+!>      private function
+! **************************************************************************************************
+   FUNCTION try_pop_r3d(list) RESULT(res)
+      TYPE(cp_sll_3d_r_type), POINTER                    :: list
+      REAL(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
+         POINTER                                         :: res
+
+      IF (ASSOCIATED(list)) THEN
+         res => cp_sll_3d_r_get_first_el(list)
+         CALL cp_sll_3d_r_rm_first_el(list)
+      ELSE
+         NULLIFY (res)
+      END IF
+   END FUNCTION try_pop_r3d
+
+! **************************************************************************************************
 !> \brief returns a pw, allocating it if none is in the pool
 !> \param pool the pool from where you get the pw
 !> \param pw will contain the new pw
@@ -261,19 +275,13 @@ CONTAINS
       TYPE(pw_type), POINTER                             :: el
 
       CALL timeset(routineN, handle)
-      NULLIFY (cr3d_ptr)
+      NULLIFY (cr3d_ptr, el)
 
       SELECT CASE (use_data)
       CASE (REALDATA1D)
          el => try_pop(pool%real1d_pw)
       CASE (REALDATA3D)
-         el => try_pop(pool%real3d_pw)
-         IF (.NOT. ASSOCIATED(el)) THEN
-            IF (ASSOCIATED(pool%real3d_array)) THEN
-               cr3d_ptr => cp_sll_3d_r_get_first_el(pool%real3d_array)
-               CALL cp_sll_3d_r_rm_first_el(pool%real3d_array)
-            END IF
-         END IF
+         cr3d_ptr => try_pop_r3d(pool%real3d_array)
       CASE (COMPLEXDATA1D)
          el => try_pop(pool%complex1d_pw)
       CASE (COMPLEXDATA3D)
@@ -283,9 +291,12 @@ CONTAINS
          CPABORT("")
       END SELECT
 
-      IF (.NOT. ASSOCIATED(el)) THEN
+      IF (ASSOCIATED(cr3d_ptr)) THEN
          CALL pw%create(pool%pw_grid, use_data=use_data, &
                         in_space=in_space, cr3d_ptr=cr3d_ptr)
+      ELSE IF (.NOT. ASSOCIATED(el)) THEN
+         CALL pw%create(pool%pw_grid, use_data=use_data, &
+                        in_space=in_space)
       ELSE
          pw = el
          DEALLOCATE (el)
@@ -336,18 +347,16 @@ CONTAINS
                END IF
             CASE (REALDATA3D)
                IF (ASSOCIATED(el%cr3d)) THEN
-                  IF (cp_sll_pw_get_length(pool%real3d_pw) < pool%max_cache) THEN
-                     CALL cp_sll_pw_insert_el(pool%real3d_pw, el=el)
+                  IF (cp_sll_3d_r_get_length(pool%real3d_array) < pool%max_cache) THEN
+                     CALL cp_sll_3d_r_insert_el(pool%real3d_array, el=el%cr3d)
+                     NULLIFY (el%cr3d)
                   ELSE
                      IF (max_max_cache >= 0) &
                         CPWARN("hit max_cache")
-                     CALL el%release()
-                     DEALLOCATE (el)
                   END IF
-               ELSE
-                  CALL el%release()
-                  DEALLOCATE (el)
                END IF
+               CALL el%release()
+               DEALLOCATE (el)
             CASE (COMPLEXDATA1D)
                IF (cp_sll_pw_get_length(pool%complex1d_pw) < pool%max_cache) THEN
                   CALL cp_sll_pw_insert_el(pool%complex1d_pw, el=el)
@@ -402,14 +411,6 @@ CONTAINS
       IF (ASSOCIATED(pw_pool%real3d_array)) THEN
          cr3d => cp_sll_3d_r_get_first_el(pw_pool%real3d_array)
          CALL cp_sll_3d_r_rm_first_el(pw_pool%real3d_array)
-      ELSE
-         pw => try_pop(pw_pool%real3d_pw)
-         IF (ASSOCIATED(pw)) THEN
-            cr3d => pw%cr3d
-            NULLIFY (pw%cr3d)
-            CALL pw%release()
-            DEALLOCATE (pw)
-         END IF
       END IF
       IF (.NOT. ASSOCIATED(cr3d)) THEN
          ALLOCATE (cr3d(pw_pool%pw_grid%bounds_local(1, 1):pw_pool%pw_grid%bounds_local(2, 1), &
