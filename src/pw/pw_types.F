@@ -23,15 +23,11 @@
 ! **************************************************************************************************
 MODULE pw_types
 
-   USE cp_log_handling, ONLY: cp_get_default_logger, &
-                              cp_logger_get_default_unit_nr, &
-                              cp_logger_type, &
-                              cp_to_string
+   USE cp_log_handling, ONLY: cp_to_string
    USE kinds, ONLY: dp
    USE pw_grid_types, ONLY: pw_grid_type
    USE pw_grids, ONLY: pw_grid_release, &
                        pw_grid_retain
-   USE timings, ONLY: print_stack
 #include "../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -141,47 +137,23 @@ CONTAINS
 !>      11.2003 created [fawzi]
 !> \author fawzi
 ! **************************************************************************************************
-   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, r3d_ptr, c3d_ptr)
+   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, r1d_ptr, c1d_ptr, r3d_ptr, c3d_ptr)
       CLASS(pw_type), INTENT(INOUT)                         :: pw
       TYPE(pw_grid_type), INTENT(IN), POINTER            :: pw_grid
       INTEGER, INTENT(in)                                :: use_data, in_space
-      REAL(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         INTENT(IN), OPTIONAL, POINTER                   :: r3d_ptr
-      COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
-         INTENT(IN), OPTIONAL, POINTER                   :: c3d_ptr
+      #:for kind, type in zip(pw_kinds, pw_types)
+         ${type}$, CONTIGUOUS, INTENT(IN), OPTIONAL, POINTER                   :: ${kind}$_ptr
+      #:endfor
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_create'
 
       INTEGER                                            :: handle
       INTEGER, DIMENSION(:, :), POINTER                  :: bounds
-      TYPE(cp_logger_type), POINTER                      :: logger
 
       CALL timeset(routineN, handle)
-      logger => cp_get_default_logger()
-      IF (debug_this_module) THEN
-         WRITE (cp_logger_get_default_unit_nr(logger), "('*** allocated pw ***')")
-         IF (PRESENT(r3d_ptr)) THEN
-            IF (ASSOCIATED(r3d_ptr)) THEN
-               WRITE (cp_logger_get_default_unit_nr(logger), "('*** cr3d associated ***')")
-            END IF
-         END IF
-         CALL print_stack(cp_logger_get_default_unit_nr(logger))
-      END IF
 
       IF (in_space /= REALSPACE .AND. in_space /= RECIPROCALSPACE) &
          CPABORT("Choose a proper space in which the grid lives!")
-
-      IF (PRESENT(r3d_ptr)) THEN
-         IF (ASSOCIATED(r3d_ptr)) THEN
-            CPASSERT(use_data == REALDATA3D)
-         END IF
-      END IF
-
-      IF (PRESENT(c3d_ptr)) THEN
-         IF (ASSOCIATED(c3d_ptr)) THEN
-            CPASSERT(use_data == COMPLEXDATA3D)
-         END IF
-      END IF
 
       ! Ensure a clean grid to prevent memory leaks
       CALL pw%release()
@@ -193,10 +165,32 @@ CONTAINS
 
       SELECT CASE (use_data)
       CASE (REALDATA1D)
-         ALLOCATE (pw%cr(pw%pw_grid%ngpts_cut_local))
+         IF (PRESENT(r1d_ptr)) THEN
+         IF (ASSOCIATED(r1d_ptr)) THEN
+         IF (ALL(bounds(1, :) <= bounds(2, :))) THEN
+            CPASSERT(LBOUND(r1d_ptr, 1) == 1)
+            CPASSERT(UBOUND(r1d_ptr, 1) == pw%pw_grid%ngpts_cut_local)
+         END IF
+         pw%cr => r1d_ptr
+         END IF
+         END IF
+         IF (.NOT. ASSOCIATED(pw%cr)) THEN
+            ALLOCATE (pw%cr(pw%pw_grid%ngpts_cut_local))
+         END IF
 
       CASE (COMPLEXDATA1D)
-         ALLOCATE (pw%cc(pw%pw_grid%ngpts_cut_local))
+         IF (PRESENT(c1d_ptr)) THEN
+         IF (ASSOCIATED(c1d_ptr)) THEN
+         IF (ALL(bounds(1, :) <= bounds(2, :))) THEN
+            CPASSERT(LBOUND(c1d_ptr, 1) == 1)
+            CPASSERT(UBOUND(c1d_ptr, 1) == pw%pw_grid%ngpts_cut_local)
+         END IF
+         pw%cc => c1d_ptr
+         END IF
+         END IF
+         IF (.NOT. ASSOCIATED(pw%cc)) THEN
+            ALLOCATE (pw%cc(pw%pw_grid%ngpts_cut_local))
+         END IF
 
       CASE (REALDATA3D)
          IF (PRESENT(r3d_ptr)) THEN
@@ -278,19 +272,8 @@ CONTAINS
          CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_create_${kind}$'
 
          INTEGER                                            :: handle
-         TYPE(cp_logger_type), POINTER                      :: logger
 
          CALL timeset(routineN, handle)
-         logger => cp_get_default_logger()
-         IF (debug_this_module) THEN
-            WRITE (cp_logger_get_default_unit_nr(logger), "('*** allocated pw ***')")
-            IF (PRESENT(array_ptr)) THEN
-               IF (ASSOCIATED(array_ptr)) THEN
-                  WRITE (cp_logger_get_default_unit_nr(logger), "('*** array associated ***')")
-               END IF
-            END IF
-            CALL print_stack(cp_logger_get_default_unit_nr(logger))
-         END IF
 
          IF (in_space /= REALSPACE .AND. in_space /= RECIPROCALSPACE) &
             CPABORT("Choose a proper space in which the grid lives!")
