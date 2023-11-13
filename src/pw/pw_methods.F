@@ -24,38 +24,40 @@
 ! **************************************************************************************************
 MODULE pw_methods
 
-   USE cp_log_handling,                 ONLY: cp_logger_get_default_io_unit,&
-                                              cp_to_string
-   USE fft_tools,                       ONLY: BWFFT,&
-                                              FWFFT,&
-                                              fft3d
-   USE kahan_sum,                       ONLY: accurate_dot_product,&
-                                              accurate_sum
-   USE kinds,                           ONLY: dp
-   USE machine,                         ONLY: m_memory
-   USE mathconstants,                   ONLY: z_zero
-   USE pw_copy_all,                     ONLY: pw_copy_match
-   USE pw_fpga,                         ONLY: pw_fpga_c1dr3d_3d_dp,&
-                                              pw_fpga_c1dr3d_3d_sp,&
-                                              pw_fpga_init_bitstream,&
-                                              pw_fpga_r3dc1d_3d_dp,&
-                                              pw_fpga_r3dc1d_3d_sp
-   USE pw_gpu,                          ONLY: pw_gpu_c1dr3d_3d,&
-                                              pw_gpu_c1dr3d_3d_ps,&
-                                              pw_gpu_r3dc1d_3d,&
-                                              pw_gpu_r3dc1d_3d_ps
-   USE pw_grid_types,                   ONLY: HALFSPACE,&
-                                              PW_MODE_DISTRIBUTED,&
-                                              PW_MODE_LOCAL,&
-                                              pw_grid_type
-   USE pw_types,                        ONLY: COMPLEXDATA1D,&
-                                              COMPLEXDATA3D,&
-                                              REALDATA1D,&
-                                              REALDATA3D,&
-                                              REALSPACE,&
-                                              RECIPROCALSPACE,&
-                                              pw_type
+   USE cp_log_handling, ONLY: cp_logger_get_default_io_unit, &
+                              cp_to_string
+   USE fft_tools, ONLY: BWFFT, &
+                        FWFFT, &
+                        fft3d
+   USE kahan_sum, ONLY: accurate_dot_product, &
+                        accurate_sum
+   USE kinds, ONLY: dp
+   USE machine, ONLY: m_memory
+   USE mathconstants, ONLY: z_zero
+   USE pw_copy_all, ONLY: pw_copy_match
+   USE pw_fpga, ONLY: pw_fpga_c1dr3d_3d_dp, &
+                      pw_fpga_c1dr3d_3d_sp, &
+                      pw_fpga_init_bitstream, &
+                      pw_fpga_r3dc1d_3d_dp, &
+                      pw_fpga_r3dc1d_3d_sp
+   USE pw_gpu, ONLY: pw_gpu_c1dr3d_3d, &
+                     pw_gpu_c1dr3d_3d_ps, &
+                     pw_gpu_r3dc1d_3d, &
+                     pw_gpu_r3dc1d_3d_ps
+   USE pw_grid_types, ONLY: HALFSPACE, &
+                            PW_MODE_DISTRIBUTED, &
+                            PW_MODE_LOCAL, &
+                            pw_grid_type
+   USE pw_types, ONLY: COMPLEXDATA1D, &
+                       COMPLEXDATA3D, &
+                       REALDATA1D, &
+                       REALDATA3D, &
+                       REALSPACE, &
+                       RECIPROCALSPACE, &
+                       pw_type, pw_r1d_type, pw_r3d_type, pw_c1d_type, pw_c3d_type
 #include "../base/base_uses.f90"
+
+   #:include 'pw_types.fypp'
 
    IMPLICIT NONE
 
@@ -75,6 +77,24 @@ MODULE pw_methods
    LOGICAL, PARAMETER, PRIVATE :: debug_this_module = .FALSE.
    INTEGER, PARAMETER, PUBLIC  ::  do_accurate_sum = 0, &
                                   do_standard_sum = 1
+
+   INTERFACE pw_zero
+      MODULE PROCEDURE pw_zero_pw
+      #:for kind in pw_kinds
+         MODULE PROCEDURE pw_zero_${kind}$
+      #:endfor
+   END INTERFACE
+
+   INTERFACE pw_copy
+      MODULE PROCEDURE pw_copy_pw
+      #:for kind in pw_kinds
+         #:for kind2 in pw_kinds
+            #:if kind[1:]==kind2[1:]
+               MODULE PROCEDURE pw_copy_${kind}$_${kind2}$
+            #:endif
+         #:endfor
+      #:endfor
+   END INTERFACE
 
    INTERFACE pw_gather
       MODULE PROCEDURE pw_gather_s, pw_gather_p
@@ -100,6 +120,7 @@ MODULE pw_methods
 
 CONTAINS
 
+   #:for kind, type in zip(pw_kinds, pw_types)
 ! **************************************************************************************************
 !> \brief Set values of a pw type to zero
 !> \param pw ...
@@ -107,7 +128,158 @@ CONTAINS
 !>      none
 !> \author apsi
 ! **************************************************************************************************
-   SUBROUTINE pw_zero(pw)
+      SUBROUTINE pw_zero_${kind}$ (pw)
+
+         TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw
+
+         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_zero'
+
+         INTEGER                                            :: handle
+
+         CALL timeset(routineN, handle)
+
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw)
+         pw%array = 0.0_dp
+!$OMP END PARALLEL WORKSHARE
+
+         CALL timestop(handle)
+
+      END SUBROUTINE pw_zero_${kind}$
+
+      #:for kind2, type2 in zip(pw_kinds, pw_types)
+
+         #:if kind[1:]==kind2[1:]
+! **************************************************************************************************
+!> \brief copy a pw type variable
+!> \param pw1 ...
+!> \param pw2 ...
+!> \par History
+!>      JGH (7-Mar-2001) : check for pw_grid %id_nr, allow copy if
+!>        in_use == COMPLEXDATA1D and in_space == RECIPROCALSPACE
+!>      JGH (21-Feb-2003) : Code for generalized reference grids
+!> \author apsi
+!> \note
+!>      Currently only copying of respective types allowed,
+!>      in order to avoid errors
+! **************************************************************************************************
+            SUBROUTINE pw_copy_${kind}$_${kind2}$ (pw1, pw2)
+
+               TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw1
+               TYPE(pw_${kind2}$_type), INTENT(INOUT)                       :: pw2
+
+               CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_copy'
+
+               INTEGER                                            :: handle
+               #:if kind[1:]=='1d'
+                  INTEGER :: i, j, ng, ng1, ng2, ns
+               #:endif
+
+               CALL timeset(routineN, handle)
+
+               IF (pw1%in_space == pw2%in_space) &
+                  CPABORT("Both grids must be in the same space!")
+               IF (pw1%pw_grid%spherical .neqv. pw2%pw_grid%spherical) &
+                  CPABORT("Both grids must be either spherical or non-spherical!")
+
+               #:if kind[1]=='1'
+                  IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
+                     IF (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical) THEN
+                        IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
+                           ng1 = SIZE(pw1%array)
+                           ng2 = SIZE(pw2%array)
+                           ng = MIN(ng1, ng2)
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, pw1, pw2)
+                           pw2%array(1:ng) = ${type2type("pw1%array(1:ng)", kind, kind2)}$
+!$OMP END PARALLEL WORKSHARE
+                           IF (ng2 > ng) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, ng2, pw2)
+                              pw2%array(ng + 1:ng2) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
+!$OMP END PARALLEL WORKSHARE
+                           END IF
+                        ELSE
+                           ng1 = SIZE(pw1%array)
+                           ng2 = SIZE(pw2%array)
+                           ns = 2*MAX(ng1, ng2)
+
+                           IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
+                              IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                                 DO i = 1, ng2
+                                    j = pw2%pw_grid%gidx(i)
+                                    pw2%array(i) = ${type2type("pw1%array(j)", kind, kind2)}$
+                                 END DO
+!$OMP END PARALLEL DO
+                              ELSE
+                                 CALL pw_zero(pw2)
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                                 DO i = 1, ng1
+                                    j = pw2%pw_grid%gidx(i)
+                                    pw2%array(j) = ${type2type("pw1%array(i)", kind, kind2)}$
+                                 END DO
+!$OMP END PARALLEL DO
+                              END IF
+                           ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
+                              IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                                 DO i = 1, ng2
+                                    j = pw1%pw_grid%gidx(i)
+                                    pw2%array(i) = ${type2type("pw1%array(j)", kind, kind2)}$
+                                 END DO
+!$OMP END PARALLEL DO
+                              ELSE
+                                 CALL pw_zero(pw2)
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                                 DO i = 1, ng1
+                                    j = pw1%pw_grid%gidx(i)
+                                    pw2%array(j) = ${type2type("pw1%array(i)", kind, kind2)}$
+                                 END DO
+!$OMP END PARALLEL DO
+                              END IF
+                           ELSE
+                              #:if kind=='c1d' and kind2=='c1d'
+                                 CALL pw_copy_match(pw1, pw2)
+                              #:else
+                                 CPABORT("Copy not implemented!")
+                              #:endif
+                           END IF
+                        END IF
+
+                     ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
+                                     pw2%pw_grid%spherical)) THEN
+!$OMP PARALLEL WORKSHARE PRIVATE(i) DEFAULT(NONE) SHARED(ns, pw1, pw2)
+                        pw2%array(1:ns) = ${type2type("pw1%array(1:ns)", kind, kind2)}$
+!$OMP END PARALLEL WORKSHARE
+                     END IF
+                  ELSE
+!$OMP PARALLEL WORKSHARE PRIVATE(i) DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%array = ${type2type("pw1%array", kind, kind2)}$
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:else
+                  IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
+                     CPABORT("3D grids must be compatible!")
+                  IF (pw1%pw_grid%spherical) &
+                     CPABORT("3D grids must not be spherical!")
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
+                  pw2%array(:, :, :) = ${type2type("pw1%array(:, :, :)", kind, kind2)}$
+!$OMP END PARALLEL WORKSHARE
+               #:endif
+
+               CALL timestop(handle)
+
+            END SUBROUTINE pw_copy_${kind}$_${kind2}$
+         #:endif
+      #:endfor
+   #:endfor
+
+! **************************************************************************************************
+!> \brief Set values of a pw type to zero
+!> \param pw ...
+!> \par History
+!>      none
+!> \author apsi
+! **************************************************************************************************
+   SUBROUTINE pw_zero_pw(pw)
 
       TYPE(pw_type), INTENT(INOUT)                       :: pw
 
@@ -139,7 +311,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE pw_zero
+   END SUBROUTINE pw_zero_pw
 
 ! **************************************************************************************************
 !> \brief copy a pw type variable
@@ -154,7 +326,7 @@ CONTAINS
 !>      Currently only copying of respective types allowed,
 !>      in order to avoid errors
 ! **************************************************************************************************
-   SUBROUTINE pw_copy(pw1, pw2)
+   SUBROUTINE pw_copy_pw(pw1, pw2)
 
       TYPE(pw_type), INTENT(IN)                          :: pw1
       TYPE(pw_type), INTENT(INOUT)                       :: pw2
@@ -367,7 +539,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE pw_copy
+   END SUBROUTINE pw_copy_pw
 
 ! **************************************************************************************************
 !> \brief ...
