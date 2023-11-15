@@ -99,6 +99,13 @@ MODULE pw_methods
       #:endfor
    END INTERFACE
 
+   INTERFACE pw_integrate_function
+      MODULE PROCEDURE pw_integrate_function_pw
+      #:for kind in pw_kinds
+         MODULE PROCEDURE pw_integrate_function_${kind}$
+      #:endfor
+   END INTERFACE
+
    INTERFACE pw_copy
       MODULE PROCEDURE pw_copy_pw
       #:for kind, kind2 in pw_kinds2_sameD
@@ -250,6 +257,64 @@ CONTAINS
          END IF
 
       END SUBROUTINE pw_write_${kind}$
+
+! **************************************************************************************************
+!> \brief ...
+!> \param fun ...
+!> \param isign ...
+!> \param oprt ...
+!> \return ...
+! **************************************************************************************************
+      FUNCTION pw_integrate_function_${kind}$ (fun, isign, oprt) RESULT(total_fun)
+
+         TYPE(pw_${kind}$_type), INTENT(IN)                          :: fun
+         INTEGER, INTENT(IN), OPTIONAL                      :: isign
+         CHARACTER(len=*), INTENT(IN), OPTIONAL             :: oprt
+         REAL(KIND=dp)                                      :: total_fun
+
+         INTEGER                                            :: iop
+
+         iop = 0
+
+         IF (PRESENT(oprt)) THEN
+            SELECT CASE (oprt)
+            CASE ("ABS", "abs")
+               iop = 1
+            CASE DEFAULT
+               CPABORT("Unknown operator")
+            END SELECT
+         END IF
+
+         total_fun = 0.0_dp
+
+         IF (fun%in_space == REALSPACE) THEN
+            ! do reduction using maximum accuracy
+            IF (iop == 1) THEN
+               total_fun = fun%pw_grid%dvol*accurate_sum(ABS(fun%array))
+            ELSE
+               total_fun = fun%pw_grid%dvol*accurate_sum(${type2type("fun%array", kind, "r1d")}$)
+            END IF
+         ELSE IF (fun%in_space == RECIPROCALSPACE) THEN
+            IF (iop == 1) &
+               CPABORT("Operator ABS not implemented")
+            #:if kind[1:]=="1d"
+               IF (fun%pw_grid%have_g0) total_fun = fun%pw_grid%vol*${type2type("fun%array(1)", kind, "r1d")}$
+            #:else
+               CPABORT("Reciprocal space integration for 3D grids not implemented!")
+            #:endif
+         ELSE
+            CPABORT("No space defined")
+         END IF
+
+         IF (fun%pw_grid%para%mode /= PW_MODE_LOCAL) THEN
+            CALL fun%pw_grid%para%group%sum(total_fun)
+         END IF
+
+         IF (PRESENT(isign)) THEN
+            total_fun = total_fun*SIGN(1._dp, REAL(isign, dp))
+         END IF
+
+      END FUNCTION pw_integrate_function_${kind}$
    #:endfor
 
    #:for kind, type, kind2, type2 in pw_list2_sameD
@@ -3349,7 +3414,7 @@ CONTAINS
 !> \param oprt ...
 !> \return ...
 ! **************************************************************************************************
-                  FUNCTION pw_integrate_function(fun, isign, oprt) RESULT(total_fun)
+                  FUNCTION pw_integrate_function_pw(fun, isign, oprt) RESULT(total_fun)
 
                      TYPE(pw_type), INTENT(IN)                          :: fun
                      INTEGER, INTENT(IN), OPTIONAL                      :: isign
@@ -3402,7 +3467,7 @@ CONTAINS
                         total_fun = total_fun*SIGN(1._dp, REAL(isign, dp))
                      END IF
 
-                  END FUNCTION pw_integrate_function
+                  END FUNCTION pw_integrate_function_pw
 
 ! **************************************************************************************************
 !> \brief Initialize pw values using values from a real array data, which might be defined on a
