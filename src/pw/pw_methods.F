@@ -745,8 +745,7 @@ CONTAINS
                            IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
 
                               IF (pw1%in_use == COMPLEXDATA1D .AND. &
-                                  pw2%in_use == COMPLEXDATA1D .AND. &
-                                  pw1%in_space == RECIPROCALSPACE) THEN
+                                  pw2%in_use == COMPLEXDATA1D) THEN
                                  ng1 = SIZE(pw1%cc)
                                  ng2 = SIZE(pw2%cc)
                                  ng = MIN(ng1, ng2)
@@ -785,8 +784,7 @@ CONTAINS
                                         pw2%pw_grid%spherical)) THEN
 
                            IF (pw1%in_use == COMPLEXDATA1D .AND. &
-                               pw2%in_use == COMPLEXDATA1D .AND. &
-                               pw1%in_space == RECIPROCALSPACE) THEN
+                               pw2%in_use == COMPLEXDATA1D) THEN
 
                               ng1 = SIZE(pw1%cc)
                               ng2 = SIZE(pw2%cc)
@@ -840,18 +838,15 @@ CONTAINS
                                  CALL pw_copy_match(pw1, pw2)
                               END IF
 
-                           ELSE IF (pw1%in_use == REALDATA3D .AND. pw1%in_use == pw2%in_use .AND. &
-                                    pw1%in_space == REALSPACE) THEN
+                           ELSE IF (pw1%in_use == REALDATA3D .AND. pw1%in_use == pw2%in_use) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
                               pw2%cr3d(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
-                           ELSE IF (pw1%in_use == COMPLEXDATA3D .AND. pw2%in_use == REALDATA3D .AND. &
-                                    pw1%in_space == REALSPACE) THEN
+                           ELSE IF (pw1%in_use == COMPLEXDATA3D .AND. pw2%in_use == REALDATA3D) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
                               pw2%cr3d(:, :, :) = REAL(pw1%cc3d(:, :, :), KIND=dp)
 !$OMP END PARALLEL WORKSHARE
-                           ELSE IF (pw1%in_use == REALDATA3D .AND. pw2%in_use == COMPLEXDATA3D .AND. &
-                                    pw1%in_space == REALSPACE) THEN
+                           ELSE IF (pw1%in_use == REALDATA3D .AND. pw2%in_use == COMPLEXDATA3D) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
                               pw2%cc3d(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
@@ -929,8 +924,6 @@ CONTAINS
                         END IF
 
                      END IF
-
-                     pw2%in_space = pw1%in_space
 
                      CALL timestop(handle)
 
@@ -1865,6 +1858,9 @@ CONTAINS
                      my_allow_noncompatible_grids = .FALSE.
                      IF (PRESENT(allow_noncompatible_grids)) my_allow_noncompatible_grids = allow_noncompatible_grids
 
+                     IF (pw1%in_space /= pw2%in_space) &
+                        CPABORT("Both grids must be in the same space for axpy!")
+
                      IF (my_beta /= 1.0_dp) THEN
                         IF (my_beta == 0.0_dp) THEN
                            CALL pw_zero(pw2)
@@ -1950,9 +1946,7 @@ CONTAINS
                      ELSE IF (pw_compatible(pw1%pw_grid, pw2%pw_grid) .OR. my_allow_noncompatible_grids) THEN
 
                         IF (pw1%in_use == COMPLEXDATA1D .AND. &
-                            pw2%in_use == COMPLEXDATA1D .AND. &
-                            pw1%in_space == RECIPROCALSPACE .AND. &
-                            pw2%in_space == RECIPROCALSPACE) THEN
+                            pw2%in_use == COMPLEXDATA1D) THEN
 
                            ng1 = SIZE(pw1%cc)
                            ng2 = SIZE(pw2%cc)
@@ -2060,9 +2054,7 @@ CONTAINS
                            END IF
 
                         ELSE IF (pw1%in_use == REALDATA3D .AND. &
-                                 pw2%in_use == REALDATA3D .AND. &
-                                 pw1%in_space == REALSPACE .AND. &
-                                 pw2%in_space == REALSPACE) THEN
+                                 pw2%in_use == REALDATA3D) THEN
 
                            IF (ANY(SHAPE(pw1%cr3d) /= SHAPE(pw2%cr3d))) &
                               CPABORT("Noncommensurate grids not implemented for real-valued grids!")
@@ -2236,8 +2228,8 @@ CONTAINS
                         CPABORT("Data field has to be COMPLEXDATA1D")
                      END IF
 
-                     ! after the gather we are in g-space
-                     pw%in_space = RECIPROCALSPACE
+                     IF (pw%in_space /= RECIPROCALSPACE) &
+                        CPABORT("Grid has to be in reciprocal space!")
 
                      ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
                                 ngpts => SIZE(pw%pw_grid%gsq), ghat => pw%pw_grid%g_hat)
@@ -2294,8 +2286,8 @@ CONTAINS
                         CPABORT("This grid type is not distributed")
                      END IF
 
-                     ! after the gather we are in g-space
-                     pw%in_space = RECIPROCALSPACE
+                     IF (pw%in_space /= RECIPROCALSPACE) &
+                        CPABORT("Grid mus be in reciprocal space!")
 
                      ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
                                 ngpts => SIZE(pw%pw_grid%gsq), ghat => pw%pw_grid%g_hat, yzq => pw%pw_grid%para%yzq)
