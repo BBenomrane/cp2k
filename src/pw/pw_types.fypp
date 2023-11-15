@@ -8,6 +8,13 @@
    #:set pw_kinds = ["r1d", "r3d", "c1d", "c3d"]
    #:set pw_types = ["REAL(KIND=dp), DIMENSION(:)", "REAL(KIND=dp), DIMENSION(:, :, :)", "COMPLEX(KIND=dp), DIMENSION(:)", "COMPLEX(KIND=dp), DIMENSION(:, :, :)"]
    #:set pw_spaces = ["rs", "gs"]
+   #:set pw_list = [a for a in zip(pw_kinds, pw_types)]
+   #:set pw_kinds2 = [(kind1, kind2) for kind1 in pw_kinds for kind2 in pw_kinds]
+   #:set pw_kinds2_sameD = [(kind1, kind2) for kind1 in pw_kinds for kind2 in pw_kinds if kind1[1:]==kind2[1:]]
+   #:set pw_types2 = [(type1, type2) for type1 in pw_types for type2 in pw_types]
+   #:set pw_types2_sameD = [(type1, type2) for type1 in pw_types for type2 in pw_types if type1.count(':')==type2.count(':')]
+   #:set pw_list2 = [a+b for a in pw_list for b in pw_list]
+   #:set pw_list2_sameD = [a+b for a in pw_list for b in pw_list if a[0][1]==b[0][1]]
 #:endmute
 
 #:def type2type(data, kind1, kind2)
