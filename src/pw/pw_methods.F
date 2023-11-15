@@ -106,6 +106,15 @@ MODULE pw_methods
       #:endfor
    END INTERFACE
 
+   INTERFACE pw_set
+      MODULE PROCEDURE pw_set_value_pw
+      MODULE PROCEDURE pw_zero_pw
+      #:for kind in pw_kinds
+         MODULE PROCEDURE pw_set_value_${kind}$
+         MODULE PROCEDURE pw_zero_${kind}$
+      #:endfor
+   END INTERFACE
+
    INTERFACE pw_copy
       MODULE PROCEDURE pw_copy_pw
       #:for kind, kind2 in pw_kinds2_sameD
@@ -147,10 +156,6 @@ MODULE pw_methods
 
    INTERFACE pw_scatter
       MODULE PROCEDURE pw_scatter_s, pw_scatter_p
-   END INTERFACE
-
-   INTERFACE pw_set
-      MODULE PROCEDURE pw_set_value, pw_set_array
    END INTERFACE
 
    INTERFACE pw_copy_to_array
@@ -315,6 +320,29 @@ CONTAINS
          END IF
 
       END FUNCTION pw_integrate_function_${kind}$
+
+! **************************************************************************************************
+!> \brief ...
+!> \param pw ...
+!> \param value ...
+! **************************************************************************************************
+      SUBROUTINE pw_set_value_${kind}$ (pw, value)
+         TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw
+         REAL(KIND=dp), INTENT(IN)                          :: value
+
+         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_set_value'
+
+         INTEGER                                            :: handle
+
+         CALL timeset(routineN, handle)
+
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw,value)
+         pw%array = value
+!$OMP END PARALLEL WORKSHARE
+
+         CALL timestop(handle)
+
+      END SUBROUTINE pw_set_value_${kind}$
    #:endfor
 
    #:for kind, type, kind2, type2 in pw_list2_sameD
@@ -3470,63 +3498,11 @@ CONTAINS
                   END FUNCTION pw_integrate_function_pw
 
 ! **************************************************************************************************
-!> \brief Initialize pw values using values from a real array data, which might be defined on a
-!>        smaller grid than pw but which is contained in it
-!> \param pw the pw to initialize
-!> \param values the array holding the input data
-!> \par History
-!>      Created 12.2016
-!> \author Nico Holmberg
-! **************************************************************************************************
-                  SUBROUTINE pw_set_array(pw, values)
-
-                     TYPE(pw_type), INTENT(INOUT)                       :: pw
-                     REAL(KIND=dp), DIMENSION(:, :, :), INTENT(IN), &
-                        POINTER                                         :: values
-
-                     CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_set_array'
-
-                     INTEGER                                            :: handle, i, j, k
-                     LOGICAL                                            :: is_match
-
-                     CALL timeset(routineN, handle)
-
-                     IF (pw%in_use == REALDATA3D) THEN
-
-                        is_match = .TRUE.
-                        is_match = is_match .AND. (LBOUND(values, 1) .GE. LBOUND(pw%cr3d, 1))
-                        is_match = is_match .AND. (UBOUND(values, 1) .LE. UBOUND(pw%cr3d, 1))
-                        is_match = is_match .AND. (LBOUND(values, 2) .GE. LBOUND(pw%cr3d, 2))
-                        is_match = is_match .AND. (UBOUND(values, 2) .LE. UBOUND(pw%cr3d, 2))
-                        is_match = is_match .AND. (LBOUND(values, 3) .GE. LBOUND(pw%cr3d, 3))
-                        is_match = is_match .AND. (UBOUND(values, 3) .LE. UBOUND(pw%cr3d, 3))
-
-                        IF (.NOT. is_match) &
-                           CPABORT("Incompatible data fields")
-                        DO i = LBOUND(values, 3), UBOUND(values, 3)
-                           DO j = LBOUND(values, 2), UBOUND(values, 2)
-                              DO k = LBOUND(values, 1), UBOUND(values, 1)
-                                 pw%cr3d(k, j, i) = values(k, j, i)
-                              END DO
-                           END DO
-                        END DO
-
-                     ELSE
-
-                        CPABORT("Illegal pw type, should be REALDATA3D")
-
-                     END IF
-
-                     CALL timestop(handle)
-
-                  END SUBROUTINE pw_set_array
-
-! **************************************************************************************************
 !> \brief ...
 !> \param pw ...
 !> \param value ...
 ! **************************************************************************************************
-                  SUBROUTINE pw_set_value(pw, value)
+                  SUBROUTINE pw_set_value_pw(pw, value)
                      TYPE(pw_type), INTENT(IN)                          :: pw
                      REAL(KIND=dp), INTENT(IN)                          :: value
 
@@ -3545,7 +3521,7 @@ CONTAINS
                      END IF
                      CALL timestop(handle)
 
-                  END SUBROUTINE pw_set_value
+                  END SUBROUTINE pw_set_value_pw
 
 ! **************************************************************************************************
 !> \brief ...
