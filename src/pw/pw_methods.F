@@ -111,11 +111,25 @@ MODULE pw_methods
    INTERFACE pw_copy_to_array
       MODULE PROCEDURE pw_copy_to_array_r
       MODULE PROCEDURE pw_copy_to_array_c
+      #:for kind in pw_kinds
+         #:for kind2 in pw_kinds
+            #:if kind[1:]==kind2[1:]
+               MODULE PROCEDURE pw_copy_to_array_${kind}$_${kind2}$
+            #:endif
+         #:endfor
+      #:endfor
    END INTERFACE
 
    INTERFACE pw_copy_from_array
       MODULE PROCEDURE pw_copy_from_array_r
       MODULE PROCEDURE pw_copy_from_array_c
+      #:for kind in pw_kinds
+         #:for kind2 in pw_kinds
+            #:if kind[1:]==kind2[1:]
+               MODULE PROCEDURE pw_copy_from_array_${kind}$_${kind2}$
+            #:endif
+         #:endfor
+      #:endfor
    END INTERFACE
 
 CONTAINS
@@ -268,6 +282,50 @@ CONTAINS
                CALL timestop(handle)
 
             END SUBROUTINE pw_copy_${kind}$_${kind2}$
+
+! **************************************************************************************************
+!> \brief ...
+!> \param pw ...
+!> \param array ...
+! **************************************************************************************************
+            SUBROUTINE pw_copy_to_array_${kind}$_${kind2}$ (pw, array)
+               TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw
+               ${type2}$, INTENT(INOUT)   :: array
+
+               CHARACTER(len=*), PARAMETER :: routineN = 'pw_copy_to_array'
+
+               INTEGER                                            :: handle
+
+               CALL timeset(routineN, handle)
+
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw, array)
+               array = ${type2type("pw%array", kind, kind2)}$
+!$OMP END PARALLEL WORKSHARE
+
+               CALL timestop(handle)
+            END SUBROUTINE pw_copy_to_array_${kind}$_${kind2}$
+
+! **************************************************************************************************
+!> \brief ...
+!> \param pw ...
+!> \param array ...
+! **************************************************************************************************
+            SUBROUTINE pw_copy_from_array_${kind}$_${kind2}$ (pw, array)
+               TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw
+               ${type2}$, INTENT(IN)      :: array
+
+               CHARACTER(len=*), PARAMETER :: routineN = 'pw_copy_from_array'
+
+               INTEGER                                            :: handle
+
+               CALL timeset(routineN, handle)
+
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw, array)
+               pw%array = ${type2type("array", kind2, kind)}$
+!$OMP END PARALLEL WORKSHARE
+
+               CALL timestop(handle)
+            END SUBROUTINE pw_copy_from_array_${kind}$_${kind2}$
          #:endif
       #:endfor
    #:endfor
