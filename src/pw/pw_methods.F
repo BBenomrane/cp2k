@@ -92,6 +92,13 @@ MODULE pw_methods
       #:endfor
    END INTERFACE
 
+   INTERFACE pw_write
+      MODULE PROCEDURE pw_write_pw
+      #:for kind in pw_kinds
+         MODULE PROCEDURE pw_write_${kind}$
+      #:endfor
+   END INTERFACE
+
    INTERFACE pw_copy
       MODULE PROCEDURE pw_copy_pw
       #:for kind in pw_kinds
@@ -225,6 +232,41 @@ CONTAINS
          CALL timestop(handle)
 
       END SUBROUTINE pw_scale_${kind}$
+
+! **************************************************************************************************
+!> \brief writes a small description of the actual grid
+!>      (change to output the data as cube file, maybe with an
+!>      optional long_description arg?)
+!> \param pw the pw data to output
+!> \param unit_nr the unit to output to
+!> \par History
+!>      08.2002 created [fawzi]
+!> \author Fawzi Mohamed
+! **************************************************************************************************
+      SUBROUTINE pw_write_${kind}$ (pw, unit_nr)
+
+         TYPE(pw_${kind}$_type), INTENT(in)                          :: pw
+         INTEGER, INTENT(in)                                :: unit_nr
+
+         INTEGER                                            :: iostatus
+
+         WRITE (unit=unit_nr, fmt="('<pw>:{ ')", iostat=iostatus)
+
+         WRITE (unit=unit_nr, fmt="(a)", iostat=iostatus) " in_use=${kind}$"
+         IF (ASSOCIATED(pw%array)) THEN
+            #:if kind[1]=='1'
+               WRITE (unit=unit_nr, fmt="(' array=<${kind[0]}$(',i8,':',i8,')>')") &
+                  LBOUND(pw%array, 1), UBOUND(pw%array, 1)
+            #:else
+               WRITE (unit=unit_nr, fmt="(' array=<${kind[0]}$(',i8,':',i8,',',i8,':',i8,',',i8,':',i8,')>')") &
+                  LBOUND(pw%array, 1), UBOUND(pw%array, 1), LBOUND(pw%array, 2), UBOUND(pw%array, 2), &
+                  LBOUND(pw%array, 3), UBOUND(pw%array, 3)
+            #:endif
+         ELSE
+            WRITE (unit=unit_nr, fmt="(' array=*null*')")
+         END IF
+
+      END SUBROUTINE pw_write_${kind}$
 
       #:for kind2, type2 in zip(pw_kinds, pw_types)
 
@@ -797,8 +839,6 @@ CONTAINS
                                  !END IF
                                  CALL pw_copy_match(pw1, pw2)
                               END IF
-
-                              pw2%in_space = RECIPROCALSPACE
 
                            ELSE IF (pw1%in_use == REALDATA3D .AND. pw1%in_use == pw2%in_use .AND. &
                                     pw1%in_space == REALSPACE) THEN
@@ -2825,9 +2865,6 @@ CONTAINS
 
                      END IF
 
-                     !..update the space tag for pw2
-                     pw2%in_space = out_space
-
                      IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) THEN
                         WRITE (out_unit, '(A)') " End of FFT Protocol "
                      END IF
@@ -2895,7 +2932,7 @@ CONTAINS
 !>      08.2002 created [fawzi]
 !> \author Fawzi Mohamed
 ! **************************************************************************************************
-                  SUBROUTINE pw_write(pw, unit_nr)
+                  SUBROUTINE pw_write_pw(pw, unit_nr)
 
                      TYPE(pw_type), INTENT(in)                          :: pw
                      INTEGER, INTENT(in)                                :: unit_nr
@@ -2957,7 +2994,7 @@ CONTAINS
                      WRITE (unit=unit_nr, fmt="(' pw_grid%id_nr=',i8,/,' }')", iostat=iostatus) &
                         pw%pw_grid%id_nr
 
-                  END SUBROUTINE pw_write
+                  END SUBROUTINE pw_write_pw
 
 ! **************************************************************************************************
 !> \brief ...
