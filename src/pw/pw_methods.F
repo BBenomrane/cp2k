@@ -114,6 +114,28 @@ MODULE pw_methods
       #:endfor
    END INTERFACE
 
+   INTERFACE pw_multiply
+      MODULE PROCEDURE pw_multiply_pw
+      #:for kind in pw_kinds
+         #:for kind2 in pw_kinds
+            #:if kind[1:]==kind2[1:]
+               MODULE PROCEDURE pw_multiply_${kind}$_${kind2}$
+            #:endif
+         #:endfor
+      #:endfor
+   END INTERFACE
+
+   INTERFACE pw_multiply_with
+      MODULE PROCEDURE pw_multiply_with_pw
+      #:for kind in pw_kinds
+         #:for kind2 in pw_kinds
+            #:if kind[1:]==kind2[1:]
+               MODULE PROCEDURE pw_multiply_with_${kind}$_${kind2}$
+            #:endif
+         #:endfor
+      #:endfor
+   END INTERFACE
+
    INTERFACE pw_gather
       MODULE PROCEDURE pw_gather_s, pw_gather_p
    END INTERFACE
@@ -530,6 +552,77 @@ CONTAINS
                      CALL timestop(handle)
 
                      END SUBROUTINE pw_axpy_${kind}$_${kind2}$
+
+! **************************************************************************************************
+!> \brief pw_out = pw_out + alpha * pw1 * pw2
+!>      alpha defaults to 1
+!> \param pw_out ...
+!> \param pw1 ...
+!> \param pw2 ...
+!> \param alpha ...
+!> \author JGH
+! **************************************************************************************************
+                     SUBROUTINE pw_multiply_${kind}$_${kind2}$ (pw_out, pw1, pw2, alpha)
+
+                        TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw_out
+                        TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw1
+                        TYPE(pw_${kind2}$_type), INTENT(IN) :: pw2
+                        REAL(KIND=dp), INTENT(IN), OPTIONAL                :: alpha
+
+                        CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_multiply'
+
+                        INTEGER                                            :: handle
+                        REAL(KIND=dp)                                      :: my_alpha
+
+                        CALL timeset(routineN, handle)
+
+                        my_alpha = 1.0_dp
+                        IF (PRESENT(alpha)) my_alpha = alpha
+
+                        IF (.NOT. ASSOCIATED(pw_out%pw_grid, pw1%pw_grid) .OR. .NOT. ASSOCIATED(pw_out%pw_grid, pw2%pw_grid)) &
+                           CPABORT("pw_multiply not implemented for non-identical grids!")
+
+                        IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw_out, pw1, pw2)
+                           pw_out%array = pw_out%array + pw1%array*${type2type("pw2%array", kind2, kind)}$
+!$OMP END PARALLEL WORKSHARE
+                        ELSE
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(my_alpha, pw_out, pw1, pw2)
+                           pw_out%array = pw_out%array + my_alpha*pw1%array*${type2type("pw2%array", kind2, kind)}$
+!$OMP END PARALLEL WORKSHARE
+                        END IF
+
+                        CALL timestop(handle)
+
+                     END SUBROUTINE pw_multiply_${kind}$_${kind2}$
+
+! **************************************************************************************************
+!> \brief ...
+!> \param pw1 ...
+!> \param pw2 ...
+! **************************************************************************************************
+                     SUBROUTINE pw_multiply_with_${kind}$_${kind2}$ (pw1, pw2)
+                        TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw1
+                        TYPE(pw_${kind2}$_type), INTENT(IN)                          :: pw2
+
+                        CHARACTER(LEN=*), PARAMETER                        :: routineN = 'pw_multiply_with'
+
+                        INTEGER                                            :: handle
+
+                        CALL timeset(routineN, handle)
+
+                        IF (pw1%in_space /= pw2%in_space) &
+                           CPABORT("Invalid space combination!")
+                        IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) &
+                           CPABORT("Incompatible grids!")
+
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
+                        pw1%array = pw1%array*${type2type("pw2%array", kind2, kind)}$
+!$OMP END PARALLEL WORKSHARE
+
+                        CALL timestop(handle)
+
+                     END SUBROUTINE pw_multiply_with_${kind}$_${kind2}$
                      #:endif
                      #:endfor
                   #:endfor
@@ -1977,7 +2070,7 @@ CONTAINS
 !> \param alpha ...
 !> \author JGH
 ! **************************************************************************************************
-                  SUBROUTINE pw_multiply(pw_out, pw1, pw2, alpha)
+                  SUBROUTINE pw_multiply_pw(pw_out, pw1, pw2, alpha)
 
                      TYPE(pw_type), INTENT(INOUT)                       :: pw_out
                      TYPE(pw_type), INTENT(IN)                          :: pw1, pw2
@@ -2076,7 +2169,7 @@ CONTAINS
 
                      CALL timestop(handle)
 
-                  END SUBROUTINE pw_multiply
+                  END SUBROUTINE pw_multiply_pw
 
 ! **************************************************************************************************
 !> \brief Gathers the pw vector from a 3d data field
@@ -3280,7 +3373,7 @@ CONTAINS
 !> \param pw1 ...
 !> \param pw2 ...
 ! **************************************************************************************************
-                  SUBROUTINE pw_multiply_with(pw1, pw2)
+                  SUBROUTINE pw_multiply_with_pw(pw1, pw2)
                      TYPE(pw_type), INTENT(INOUT)                       :: pw1
                      TYPE(pw_type), INTENT(IN)                          :: pw2
 
@@ -3324,6 +3417,6 @@ CONTAINS
                      END IF
                      CALL timestop(handle)
 
-                  END SUBROUTINE pw_multiply_with
+                  END SUBROUTINE pw_multiply_with_pw
 
                   END MODULE pw_methods
