@@ -1382,6 +1382,7 @@ set(CP2K_PROGS_F
     start/cp2k.F
     common/memory_utilities_unittest.F
     common/parallel_rng_types_unittest.F
+    pw/pw_types_unittest.F
     metadyn_tools/graph.F
     motion/dumpdcd.F
     motion/xyz2dcd.F
@@ -1648,6 +1649,7 @@ list(
   __CP2K_APPS
   "memory_utilities_unittest"
   "parallel_rng_types_unittest"
+  "pw_types_unittest"
   "graph"
   "dumpdcd"
   "xyz2dcd"
@@ -1661,6 +1663,7 @@ add_executable(cp2k-bin start/cp2k.F)
 
 add_executable(memory_utilities_unittest common/memory_utilities_unittest.F)
 add_executable(parallel_rng_types_unittest common/parallel_rng_types_unittest.F)
+add_executable(pw_types_unittest pw/pw_types_unittest.F)
 add_executable(graph metadyn_tools/graph.F)
 add_executable(dumpdcd motion/dumpdcd.F)
 add_executable(xyz2dcd motion/xyz2dcd.F)

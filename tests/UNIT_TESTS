@@ -8,5 +8,5 @@ libcp2k_unittest
 memory_utilities_unittest
 nequip_unittest                                          libtorch
 parallel_rng_types_unittest
-
+pw_types_unittest
 #EOF
