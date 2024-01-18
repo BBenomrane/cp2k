@@ -385,7 +385,10 @@ CONTAINS
 
          CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_copy'
 
-         INTEGER                                            :: handle, ns
+         INTEGER                                            :: handle
+         #:if kind[1]=="1"
+            INTEGER :: ns
+         #:endif
          #:if kind=="c1d"
             INTEGER                                            :: i, j, ng, ng1, ng2
          #:endif
@@ -501,29 +504,24 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                #:elif kind=="c1d"
                   ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-                  ns = SIZE(pw1%cc)
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
                   pw2%array(1:ns) = pw1%cc(1:ns)
 !$OMP END PARALLEL WORKSHARE
                #:elif kind=="r3d"
                   ELSE IF (pw1%in_use == REALDATA3D) THEN
-                  ns = SIZE(pw1%cr3d)
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
                   pw2%array(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
                   ELSE IF (pw1%in_use == COMPLEXDATA3D) THEN
-                  ns = SIZE(pw1%cc3d)
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
                   pw2%array(:, :, :) = REAL(pw1%cc3d(:, :, :), KIND=dp)
 !$OMP END PARALLEL WORKSHARE
                #:else
                   ELSE IF (pw1%in_use == COMPLEXDATA3D) THEN
-                  ns = SIZE(pw1%cc3d)
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
                   pw2%array(:, :, :) = pw1%cc3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
                   ELSE IF (pw1%in_use == REALDATA3D) THEN
-                  ns = SIZE(pw1%cc3d)
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
                   pw2%array(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
@@ -1731,7 +1729,7 @@ CONTAINS
 
                                              CALL timeset(routineN, handle)
 
-                                             IF (pw1%in_space == pw2%in_space) &
+                                             IF (pw1%in_space /= pw2%in_space) &
                                                 CPABORT("Both grids must be in the same space!")
                                              IF (pw1%pw_grid%spherical .neqv. pw2%pw_grid%spherical) &
                                                 CPABORT("")!Both grids must be either spherical or non-spherical!")
@@ -1811,10 +1809,10 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                                                 END IF
                                              #:else
-                                                IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
-                                                   CPABORT("")!3D grids must be compatible!")
+                                                IF (.NOT. pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
+                                                   CPABORT("3D grids must be compatible!")
                                                 IF (pw1%pw_grid%spherical) &
-                                                   CPABORT("")!3D grids must not be spherical!")
+                                                   CPABORT("3D grids must not be spherical!")
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
                                                 pw2%array(:, :, :) = ${type2type("pw1%array(:, :, :)", kind, kind2)}$
 !$OMP END PARALLEL WORKSHARE
