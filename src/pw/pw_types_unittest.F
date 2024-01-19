@@ -17,7 +17,9 @@ PROGRAM pw_types_unittest
    USE pw_grids, ONLY: pw_grid_create, &
                        pw_grid_release, &
                        pw_grid_setup
-   USE pw_types, ONLY: REALSPACE, pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, REALDATA3D, COMPLEXDATA3D
+   USE pw_types, ONLY: REALSPACE, RECIPROCALSPACE, &
+                       pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
+                       REALDATA3D, COMPLEXDATA3D
    USE pw_methods, ONLY: pw_copy, pw_set
 
    #:include "pw_types.fypp"
@@ -40,6 +42,8 @@ PROGRAM pw_types_unittest
    #:for kind in pw_kinds
       #{if kind[1]=="3"}# TYPE(pw_type) :: pw_${kind}$_real_old_1, pw_${kind}$_real_old_2#{endif}#
       TYPE(pw_${kind}$_type) :: pw_${kind}$_real_new_1, pw_${kind}$_real_new_2
+      #{if kind[1]=="3"}# TYPE(pw_type) :: pw_${kind}$_rec_old_1, pw_${kind}$_rec_old_2#{endif}#
+      TYPE(pw_${kind}$_type) :: pw_${kind}$_rec_new_1, pw_${kind}$_rec_new_2
    #:endfor
 
    npts = 200
@@ -100,6 +104,18 @@ PROGRAM pw_types_unittest
    CALL pw_c1d_real_new_2%create(grid, REALSPACE)
    CALL pw_r1d_real_new_1%create(grid, REALSPACE)
    CALL pw_r1d_real_new_2%create(grid, REALSPACE)
+   CALL pw_c3d_rec_old_1%create(grid, COMPLEXDATA3D, RECIPROCALSPACE)
+   CALL pw_c3d_rec_old_2%create(grid, COMPLEXDATA3D, RECIPROCALSPACE)
+   CALL pw_c3d_rec_new_1%create(grid, RECIPROCALSPACE)
+   CALL pw_c3d_rec_new_2%create(grid, RECIPROCALSPACE)
+   CALL pw_r3d_rec_old_1%create(grid, REALDATA3D, RECIPROCALSPACE)
+   CALL pw_r3d_rec_old_2%create(grid, REALDATA3D, RECIPROCALSPACE)
+   CALL pw_r3d_rec_new_1%create(grid, RECIPROCALSPACE)
+   CALL pw_r3d_rec_new_2%create(grid, RECIPROCALSPACE)
+   CALL pw_c1d_rec_new_1%create(grid, RECIPROCALSPACE)
+   CALL pw_c1d_rec_new_2%create(grid, RECIPROCALSPACE)
+   CALL pw_r1d_rec_new_1%create(grid, RECIPROCALSPACE)
+   CALL pw_r1d_rec_new_2%create(grid, RECIPROCALSPACE)
 
    CALL test_pw_copy()
 
@@ -115,6 +131,18 @@ PROGRAM pw_types_unittest
    CALL pw_c1d_real_new_2%release()
    CALL pw_r1d_real_new_1%release()
    CALL pw_r1d_real_new_2%release()
+   CALL pw_c3d_rec_old_1%release()
+   CALL pw_c3d_rec_old_2%release()
+   CALL pw_c3d_rec_new_1%release()
+   CALL pw_c3d_rec_new_2%release()
+   CALL pw_r3d_rec_old_1%release()
+   CALL pw_r3d_rec_old_2%release()
+   CALL pw_r3d_rec_new_1%release()
+   CALL pw_r3d_rec_new_2%release()
+   CALL pw_c1d_rec_new_1%release()
+   CALL pw_c1d_rec_new_2%release()
+   CALL pw_r1d_rec_new_1%release()
+   CALL pw_r1d_rec_new_2%release()
 
    CALL pw_grid_release(grid)
 
@@ -127,37 +155,39 @@ CONTAINS
 
       REAL(KIND=dp) :: error
 
-      #:for kind, kind2 in pw_kinds2_sameD
-         CALL pw_set(pw_${kind}$_real_new_1, 1.0_dp)
-         CALL pw_copy(pw_${kind}$_real_new_1, pw_${kind}$_real_new_2)
+      #:for space in ["real", "rec"]
+         #:for kind, kind2 in pw_kinds2_sameD
+            CALL pw_set(pw_${kind}$_${space}$_new_1, 1.0_dp)
+            CALL pw_copy(pw_${kind}$_${space}$_new_1, pw_${kind}$_${space}$_new_2)
 
-         error = MAXVAL(ABS(pw_${kind}$_real_new_2%array - pw_${kind}$_real_new_1%array))
-         CALL mpi_comm%max(error)
-         IF (error > 0.0_dp) &
-            ERROR STOP "Copying new ${kind}$ to new ${kind}$ grid does not work!"
-
-         #:if kind[1]=="3"
-            CALL pw_copy(pw_${kind}$_real_new_2, pw_${kind2}$_real_old_1)
-
-            error = MAXVAL(ABS(pw_${kind}$_real_new_2%array - pw_${kind2}$_real_old_1%${kind2comp(kind2)}$))
+            error = MAXVAL(ABS(pw_${kind}$_${space}$_new_2%array - pw_${kind}$_${space}$_new_1%array))
             CALL mpi_comm%max(error)
             IF (error > 0.0_dp) &
-               ERROR STOP "Copying new ${kind}$ to old ${kind2}$ grid does not work!"
+               ERROR STOP "Copying new ${kind}$ to new ${kind}$ ${space}$ grid does not work!"
 
-            CALL pw_copy(pw_${kind2}$_real_old_1, pw_${kind2}$_real_old_2)
+            #:if kind[1]=="3"
+               CALL pw_copy(pw_${kind}$_${space}$_new_2, pw_${kind2}$_${space}$_old_1)
 
-            error = MAXVAL(ABS(pw_${kind2}$_real_old_1%${kind2comp(kind2)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying old ${kind2}$ to old ${kind2}$ grid does not work!"
+               error = MAXVAL(ABS(pw_${kind}$_${space}$_new_2%array - pw_${kind2}$_${space}$_old_1%${kind2comp(kind2)}$))
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) &
+                  ERROR STOP "Copying new ${kind}$ to old ${kind2}$ ${space}$ grid does not work!"
 
-            CALL pw_copy(pw_${kind2}$_real_old_2, pw_${kind}$_real_new_1)
+               CALL pw_copy(pw_${kind2}$_${space}$_old_1, pw_${kind2}$_${space}$_old_2)
 
-            error = MAXVAL(ABS(pw_${kind2}$_real_old_2%${kind2comp(kind2)}$-pw_${kind}$_real_new_1%array))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying old ${kind2}$ to new ${kind}$ grid does not work!"
-         #:endif
+            error = MAXVAL(ABS(pw_${kind2}$_${space}$_old_1%${kind2comp(kind2)}$-pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$))
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) &
+                  ERROR STOP "Copying old ${kind2}$ to old ${kind2}$ ${space}$ grid does not work!"
+
+               CALL pw_copy(pw_${kind2}$_${space}$_old_2, pw_${kind}$_${space}$_new_1)
+
+               error = MAXVAL(ABS(pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$-pw_${kind}$_${space}$_new_1%array))
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) &
+                  ERROR STOP "Copying old ${kind2}$ to new ${kind}$ ${space}$ grid does not work!"
+            #:endif
+         #:endfor
       #:endfor
 
    END SUBROUTINE test_pw_copy
