@@ -22,7 +22,11 @@ PROGRAM pw_types_unittest
    USE pw_types, ONLY: REALSPACE, RECIPROCALSPACE, &
                        pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
                        REALDATA3D, COMPLEXDATA3D
-   USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set, pw_gather, pw_scatter
+   USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set, pw_gather, pw_scatter, &
+                         pw_transfer, pw_integrate_function
+   USE fft_tools, ONLY: fft3d, &
+                        finalize_fft, &
+                        init_fft
 
    #:include "pw_types.fypp"
 
@@ -41,6 +45,7 @@ PROGRAM pw_types_unittest
    TYPE(mp_comm_type) :: mpi_comm
    TYPE(mp_para_env_type), POINTER :: para_env
    CHARACTER(len=32)                :: arg
+   CHARACTER(LEN=*), PARAMETER                      :: wisdom_file = "/etc/fftw/wisdom"
    #:for kind in pw_kinds
       #{if kind[1]=="3"}# TYPE(pw_type) :: pw_${kind}$_real_old_1, pw_${kind}$_real_old_2#{endif}#
       TYPE(pw_${kind}$_type) :: pw_${kind}$_real_new_1, pw_${kind}$_real_new_2
@@ -75,6 +80,8 @@ PROGRAM pw_types_unittest
 
    CALL mp_world_init(mpi_comm)
    ionode = mpi_comm%is_source()
+
+   CALL init_fft_library()
 
    hmat = RESHAPE((/cell_parameter, 0.0_dp, 0.0_dp, 0.0_dp, cell_parameter, 0.0_dp, 0.0_dp, 0.0_dp, cell_parameter/), (/3, 3/))
 
@@ -116,6 +123,7 @@ PROGRAM pw_types_unittest
    CALL test_pw_copy()
    CALL test_pw_copy_array()
    CALL test_pw_gather_scatter()
+   CALL test_pw_transfer()
 
    CALL pw_c3d_real_old_1%release()
    CALL pw_c3d_real_old_2%release()
@@ -143,6 +151,8 @@ PROGRAM pw_types_unittest
    CALL pw_r1d_rec_new_2%release()
 
    CALL pw_grid_release(grid)
+
+   CALL finalize_fft_library()
 
    CALL mp_para_env_release(para_env)
    CALL mp_world_finalize()
@@ -201,7 +211,6 @@ CONTAINS
 
       #:for kind, kind2 in pw_kinds2_sameD
          CALL pw_set(pw_${kind}$_${space}$_new_1, 2.0_dp)
-         WRITE (*, *) "${kind}$", "${kind2}$", "new", SHAPE(pw_${kind}$_real_new_2%array), SHAPE(pw_${kind2}$_real_new_1%array)
          CALL pw_copy_to_array(pw_${kind}$_real_new_1, pw_${kind2}$_real_new_2%array)
 
          error = MAXVAL(ABS(pw_${kind}$_real_new_2%array - pw_${kind2}$_real_new_1%array))
@@ -209,7 +218,6 @@ CONTAINS
          IF (error > 0.0_dp) &
             ERROR STOP "Copying new ${kind}$ to new array ${kind}$ grid does not work!"
 
-         WRITE (*, *) "${kind}$", "${kind2}$", "new", SHAPE(pw_${kind}$_rec_new_1%array), SHAPE(pw_${kind2}$_real_new_2%array)
          CALL pw_copy_from_array(pw_${kind}$_rec_new_1, pw_${kind2}$_real_new_2%array)
 
          error = MAXVAL(ABS(pw_${kind}$_rec_new_1%array - pw_${kind2}$_real_new_2%array))
@@ -219,7 +227,6 @@ CONTAINS
 
          #:if kind[1]=="3"
             CALL pw_set(pw_${kind}$_real_old_1, 3.0_dp)
-            WRITE (*, *) "${kind}$", "${kind2}$", "old", SHAPE(pw_${kind}$_real_old_2%${kind2comp(kind)}$), SHAPE(pw_${kind2}$_real_old_1%${kind2comp(kind2)}$)
             CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
             error = MAXVAL(ABS(pw_${kind}$_real_old_1%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$))
@@ -227,7 +234,6 @@ CONTAINS
             IF (error > 0.0_dp) &
                ERROR STOP "Copying old ${kind}$ to array ${kind2}$ grid does not work!"
 
-            WRITE (*, *) "${kind}$", "${kind2}$", "old", SHAPE(pw_${kind}$_rec_old_2%${kind2comp(kind)}$), SHAPE(pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
             CALL pw_copy_from_array(pw_${kind}$_rec_old_2, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
             error = MAXVAL(ABS(pw_${kind}$_rec_old_2%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$))
@@ -256,7 +262,69 @@ CONTAINS
          #:endif
       #:endfor
 
+      WRITE (default_output_unit, "(T3,A)") "Testing pw_gather and pw_scatter successful!"
+
    END SUBROUTINE test_pw_gather_scatter
+
+   SUBROUTINE test_pw_transfer()
+
+      REAL(KIND=dp) :: error, tmp
+
+! We try to transform and check the integral
+      CALL pw_set(pw_r3d_real_new_1, 0.7_dp)
+      CALL pw_transfer(pw_r3d_real_new_1, pw_c1d_rec_new_1)
+      tmp = pw_integrate_function(pw_r3d_real_new_1)
+      error = ABS(tmp - pw_integrate_function(pw_c1d_rec_new_1))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new r3d real to new c1d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+
+      CALL pw_transfer(pw_c1d_rec_new_1, pw_r3d_real_new_2)
+      tmp = pw_integrate_function(pw_c1d_rec_new_1)
+      error = ABS(tmp - pw_integrate_function(pw_r3d_real_new_2))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T28,F18.10)") "FFT from new r3d real to new c1d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+      error = MAXVAL(ABS(pw_r3d_real_new_1%array - pw_r3d_real_new_2%array))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new r3d real to new c1d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+
+      WRITE (default_output_unit, "(T3,A)") "Testing pw_transfer successful!"
+
+   END SUBROUTINE test_pw_transfer
+
+   SUBROUTINE init_fft_library()
+      ! This parameter is given by fftw_plan_estimate in input_constants which is not allowed to be referenced from here
+      INTEGER, PARAMETER                                            :: fftw_plan_type = 1
+      INTEGER                                            :: n(3), stat
+      COMPLEX(KIND=dp), DIMENSION(4, 4, 4)               :: zz
+
+      CALL init_fft("FFTW3", alltoall=.FALSE., fftsg_sizes=.TRUE., &
+                    pool_limit=10, &
+                    wisdom_file=wisdom_file, &
+                    plan_style=fftw_plan_type)
+      n = 4
+      zz = 0.0_dp
+      CALL fft3d(1, n, zz, status=stat)
+      IF (stat /= 0) THEN
+         CALL init_fft("FFTSG", alltoall=.FALSE., fftsg_sizes=.TRUE., &
+                       pool_limit=10, &
+                       wisdom_file=wisdom_file, &
+                       plan_style=fftw_plan_type)
+         CALL fft3d(1, n, zz, status=stat)
+         IF (stat /= 0) &
+            ERROR STOP "No FFT library available"
+      END IF
+
+   END SUBROUTINE init_fft_library
+
+   SUBROUTINE finalize_fft_library()
+      CALL finalize_fft(para_env, wisdom_file)
+   END SUBROUTINE finalize_fft_library
 
 END PROGRAM pw_types_unitTEST
 ! vim: set ts=3 sw=3 tw=132 :
