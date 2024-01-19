@@ -5552,6 +5552,10 @@ CONTAINS
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw,value)
                                                                   pw%cr3d = value
 !$OMP END PARALLEL WORKSHARE
+                                                               ELSE IF (pw%in_use == COMPLEXDATA3D) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw,value)
+                                                                  pw%cc3d = value
+!$OMP END PARALLEL WORKSHARE
                                                                ELSE
                                                                   CPABORT("")!Illegal pw type, should be REALDATA3D.")
                                                                END IF

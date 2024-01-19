@@ -7,6 +7,8 @@
 
 PROGRAM pw_types_unittest
    USE kinds, ONLY: dp
+   USE machine, ONLY: &
+      default_output_unit
    USE message_passing, ONLY: mp_comm_type, &
                               mp_para_env_release, &
                               mp_para_env_type, &
@@ -20,7 +22,7 @@ PROGRAM pw_types_unittest
    USE pw_types, ONLY: REALSPACE, RECIPROCALSPACE, &
                        pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
                        REALDATA3D, COMPLEXDATA3D
-   USE pw_methods, ONLY: pw_copy, pw_set
+   USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set
 
    #:include "pw_types.fypp"
 
@@ -46,15 +48,9 @@ PROGRAM pw_types_unittest
       TYPE(pw_${kind}$_type) :: pw_${kind}$_rec_new_1, pw_${kind}$_rec_new_2
    #:endfor
 
-   npts = 200
+   npts = 20
    cell_parameter = 5.0
    nargs = command_argument_count()
-
-   WRITE (*, *) nargs
-   DO i_arg = 1, nargs
-      CALL GET_COMMAND_ARGUMENT(i_arg, arg)
-      WRITE (*, *) i_arg, ">", arg, "<"
-   END DO
 
    IF (nargs > 1) &
       ERROR STOP "Usage pw_types_unittest"
@@ -118,6 +114,7 @@ PROGRAM pw_types_unittest
    CALL pw_r1d_rec_new_2%create(grid, RECIPROCALSPACE)
 
    CALL test_pw_copy()
+   CALL test_pw_copy_array()
 
    CALL pw_c3d_real_old_1%release()
    CALL pw_c3d_real_old_2%release()
@@ -190,7 +187,58 @@ CONTAINS
          #:endfor
       #:endfor
 
+      WRITE (default_output_unit, "(T3,A)") "Testing pw_copy successful!"
+
    END SUBROUTINE test_pw_copy
+
+   SUBROUTINE test_pw_copy_array()
+
+      REAL(KIND=dp) :: error
+
+      ! We use these routines to copy between realspace and reciprocal space grid
+      ! This is usually not their purpose but here a mere test
+
+      #:for kind, kind2 in pw_kinds2_sameD
+         CALL pw_set(pw_${kind}$_${space}$_new_1, 2.0_dp)
+         WRITE (*, *) "${kind}$", "${kind2}$", "new", SHAPE(pw_${kind}$_real_new_2%array), SHAPE(pw_${kind2}$_real_new_1%array)
+         CALL pw_copy_to_array(pw_${kind}$_real_new_1, pw_${kind2}$_real_new_2%array)
+
+         error = MAXVAL(ABS(pw_${kind}$_real_new_2%array - pw_${kind2}$_real_new_1%array))
+         CALL mpi_comm%max(error)
+         IF (error > 0.0_dp) &
+            ERROR STOP "Copying new ${kind}$ to new array ${kind}$ grid does not work!"
+
+         WRITE (*, *) "${kind}$", "${kind2}$", "new", SHAPE(pw_${kind}$_rec_new_1%array), SHAPE(pw_${kind2}$_real_new_2%array)
+         CALL pw_copy_from_array(pw_${kind}$_rec_new_1, pw_${kind2}$_real_new_2%array)
+
+         error = MAXVAL(ABS(pw_${kind}$_rec_new_1%array - pw_${kind2}$_real_new_2%array))
+         CALL mpi_comm%max(error)
+         IF (error > 0.0_dp) &
+            ERROR STOP "Copying array ${kind}$ to new ${kind}$ grid does not work!"
+
+         #:if kind[1]=="3"
+            CALL pw_set(pw_${kind}$_real_old_1, 3.0_dp)
+            WRITE (*, *) "${kind}$", "${kind2}$", "old", SHAPE(pw_${kind}$_real_old_2%${kind2comp(kind)}$), SHAPE(pw_${kind2}$_real_old_1%${kind2comp(kind2)}$)
+            CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+
+            error = MAXVAL(ABS(pw_${kind}$_real_old_1%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$))
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying old ${kind}$ to array ${kind2}$ grid does not work!"
+
+            WRITE (*, *) "${kind}$", "${kind2}$", "old", SHAPE(pw_${kind}$_rec_old_2%${kind2comp(kind)}$), SHAPE(pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+            CALL pw_copy_from_array(pw_${kind}$_rec_old_2, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+
+            error = MAXVAL(ABS(pw_${kind}$_rec_old_2%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$))
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying array ${kind}$ to old ${kind}$ grid does not work!"
+         #:endif
+      #:endfor
+
+      WRITE (default_output_unit, "(T3,A)") "Testing pw_copy_to_array and pw_copy_from_array successful!"
+
+   END SUBROUTINE test_pw_copy_array
 
 END PROGRAM pw_types_unitTEST
 ! vim: set ts=3 sw=3 tw=132 :
