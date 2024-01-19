@@ -22,7 +22,7 @@ PROGRAM pw_types_unittest
    USE pw_types, ONLY: REALSPACE, RECIPROCALSPACE, &
                        pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
                        REALDATA3D, COMPLEXDATA3D
-   USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set
+   USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set, pw_gather, pw_scatter
 
    #:include "pw_types.fypp"
 
@@ -115,6 +115,7 @@ PROGRAM pw_types_unittest
 
    CALL test_pw_copy()
    CALL test_pw_copy_array()
+   CALL test_pw_gather_scatter()
 
    CALL pw_c3d_real_old_1%release()
    CALL pw_c3d_real_old_2%release()
@@ -239,6 +240,23 @@ CONTAINS
       WRITE (default_output_unit, "(T3,A)") "Testing pw_copy_to_array and pw_copy_from_array successful!"
 
    END SUBROUTINE test_pw_copy_array
+
+   SUBROUTINE test_pw_gather_scatter()
+      REAL(KIND=dp) :: error
+
+      #:for kind, kind2 in pw_kinds2
+         #:if kind[1]=="1" and kind2[1]=="3"
+            CALL pw_gather(pw_${kind}$_rec_new_2, pw_${kind2}$_rec_new_1%array)
+            CALL pw_scatter(pw_${kind}$_rec_new_2, pw_${kind2}$_real_new_2%array)
+
+            error = MAXVAL(ABS(pw_${kind2}$_rec_new_1%array - pw_${kind2}$_real_new_2%array))
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Scatter between ${kind2}$ and ${kind}$ does not work!"
+         #:endif
+      #:endfor
+
+   END SUBROUTINE test_pw_gather_scatter
 
 END PROGRAM pw_types_unitTEST
 ! vim: set ts=3 sw=3 tw=132 :
