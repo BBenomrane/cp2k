@@ -71,6 +71,7 @@ MODULE pw_methods
    PUBLIC :: pw_integral_ab, pw_integral_a2b
    PUBLIC :: pw_dr2_gg, pw_integrate_function
    PUBLIC :: pw_set, pw_truncated
+   PUBLIC :: pw_scatter, pw_gather
    PUBLIC :: pw_copy_to_array, pw_copy_from_array
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'pw_methods'
