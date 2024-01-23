@@ -47,9 +47,9 @@ PROGRAM pw_types_unittest
    CHARACTER(len=32)                :: arg
    CHARACTER(LEN=*), PARAMETER                      :: wisdom_file = "/etc/fftw/wisdom"
    #:for kind in pw_kinds
-      #{if kind[1]=="3"}# TYPE(pw_type) :: pw_${kind}$_real_old_1, pw_${kind}$_real_old_2#{endif}#
+      TYPE(pw_type) :: pw_${kind}$_real_old_1, pw_${kind}$_real_old_2
       TYPE(pw_${kind}$_type) :: pw_${kind}$_real_new_1, pw_${kind}$_real_new_2
-      #{if kind[1]=="3"}# TYPE(pw_type) :: pw_${kind}$_rec_old_1, pw_${kind}$_rec_old_2#{endif}#
+      TYPE(pw_type) :: pw_${kind}$_rec_old_1, pw_${kind}$_rec_old_2
       TYPE(pw_${kind}$_type) :: pw_${kind}$_rec_new_1, pw_${kind}$_rec_new_2
    #:endfor
 
@@ -105,8 +105,12 @@ PROGRAM pw_types_unittest
    CALL pw_r3d_real_old_2%create(grid, REALDATA3D, REALSPACE)
    CALL pw_r3d_real_new_1%create(grid, REALSPACE)
    CALL pw_r3d_real_new_2%create(grid, REALSPACE)
+   CALL pw_c1d_real_old_1%create(grid, COMPLEXDATA1D, REALSPACE)
+   CALL pw_c1d_real_old_2%create(grid, COMPLEXDATA1D, REALSPACE)
    CALL pw_c1d_real_new_1%create(grid, REALSPACE)
    CALL pw_c1d_real_new_2%create(grid, REALSPACE)
+   CALL pw_r1d_real_old_1%create(grid, REALDATA1D, REALSPACE)
+   CALL pw_r1d_real_old_2%create(grid, REALDATA1D, REALSPACE)
    CALL pw_r1d_real_new_1%create(grid, REALSPACE)
    CALL pw_r1d_real_new_2%create(grid, REALSPACE)
    CALL pw_c3d_rec_old_1%create(grid, COMPLEXDATA3D, RECIPROCALSPACE)
@@ -117,8 +121,12 @@ PROGRAM pw_types_unittest
    CALL pw_r3d_rec_old_2%create(grid, REALDATA3D, RECIPROCALSPACE)
    CALL pw_r3d_rec_new_1%create(grid, RECIPROCALSPACE)
    CALL pw_r3d_rec_new_2%create(grid, RECIPROCALSPACE)
+   CALL pw_c1d_rec_old_1%create(grid, COMPLEXDATA1D, RECIPROCALSPACE)
+   CALL pw_c1d_rec_old_2%create(grid, COMPLEXDATA1D, RECIPROCALSPACE)
    CALL pw_c1d_rec_new_1%create(grid, RECIPROCALSPACE)
    CALL pw_c1d_rec_new_2%create(grid, RECIPROCALSPACE)
+   CALL pw_r1d_rec_old_1%create(grid, REALDATA1D, RECIPROCALSPACE)
+   CALL pw_r1d_rec_old_2%create(grid, REALDATA1D, RECIPROCALSPACE)
    CALL pw_r1d_rec_new_1%create(grid, RECIPROCALSPACE)
    CALL pw_r1d_rec_new_2%create(grid, RECIPROCALSPACE)
 
@@ -127,30 +135,14 @@ PROGRAM pw_types_unittest
    CALL test_pw_gather_scatter()
    CALL test_pw_transfer()
 
-   CALL pw_c3d_real_old_1%release()
-   CALL pw_c3d_real_old_2%release()
-   CALL pw_c3d_real_new_1%release()
-   CALL pw_c3d_real_new_2%release()
-   CALL pw_r3d_real_old_1%release()
-   CALL pw_r3d_real_old_2%release()
-   CALL pw_r3d_real_new_1%release()
-   CALL pw_r3d_real_new_2%release()
-   CALL pw_c1d_real_new_1%release()
-   CALL pw_c1d_real_new_2%release()
-   CALL pw_r1d_real_new_1%release()
-   CALL pw_r1d_real_new_2%release()
-   CALL pw_c3d_rec_old_1%release()
-   CALL pw_c3d_rec_old_2%release()
-   CALL pw_c3d_rec_new_1%release()
-   CALL pw_c3d_rec_new_2%release()
-   CALL pw_r3d_rec_old_1%release()
-   CALL pw_r3d_rec_old_2%release()
-   CALL pw_r3d_rec_new_1%release()
-   CALL pw_r3d_rec_new_2%release()
-   CALL pw_c1d_rec_new_1%release()
-   CALL pw_c1d_rec_new_2%release()
-   CALL pw_r1d_rec_new_1%release()
-   CALL pw_r1d_rec_new_2%release()
+   #:for kind in pw_kinds
+      #:for space in ["real", "rec"]
+         #:for age in ["old", "new"]
+            CALL pw_${kind}$_${space}$_${age}$_1%release()
+            CALL pw_${kind}$_${space}$_${age}$_2%release()
+         #:endfor
+      #:endfor
+   #:endfor
 
    CALL pw_grid_release(grid)
 
@@ -175,28 +167,26 @@ CONTAINS
             IF (error > 0.0_dp) &
                ERROR STOP "Copying new ${kind}$ to new ${kind}$ ${space}$ grid does not work!"
 
-            #:if kind[1]=="3"
-               CALL pw_copy(pw_${kind}$_${space}$_new_2, pw_${kind2}$_${space}$_old_1)
+            CALL pw_copy(pw_${kind}$_${space}$_new_2, pw_${kind2}$_${space}$_old_1)
 
            error = MAXVAL(ABS(REAL(pw_${kind}$_${space}$_new_2%array - pw_${kind2}$_${space}$_old_1%${kind2comp(kind2)}$, KIND=dp)))
-               CALL mpi_comm%max(error)
-               IF (error > 0.0_dp) &
-                  ERROR STOP "Copying new ${kind}$ to old ${kind2}$ ${space}$ grid does not work!"
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying new ${kind}$ to old ${kind2}$ ${space}$ grid does not work!"
 
-               CALL pw_copy(pw_${kind2}$_${space}$_old_1, pw_${kind2}$_${space}$_old_2)
+            CALL pw_copy(pw_${kind2}$_${space}$_old_1, pw_${kind2}$_${space}$_old_2)
 
             error = MAXVAL(ABS(pw_${kind2}$_${space}$_old_1%${kind2comp(kind2)}$-pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$))
-               CALL mpi_comm%max(error)
-               IF (error > 0.0_dp) &
-                  ERROR STOP "Copying old ${kind2}$ to old ${kind2}$ ${space}$ grid does not work!"
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying old ${kind2}$ to old ${kind2}$ ${space}$ grid does not work!"
 
-               CALL pw_copy(pw_${kind2}$_${space}$_old_2, pw_${kind}$_${space}$_new_1)
+            CALL pw_copy(pw_${kind2}$_${space}$_old_2, pw_${kind}$_${space}$_new_1)
 
-             error = MAXVAL(ABS(REAL(pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$-pw_${kind}$_${space}$_new_1%array, KIND=dp)))
-               CALL mpi_comm%max(error)
-               IF (error > 0.0_dp) &
-                  ERROR STOP "Copying old ${kind2}$ to new ${kind}$ ${space}$ grid does not work!"
-            #:endif
+            error = MAXVAL(ABS(REAL(pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$-pw_${kind}$_${space}$_new_1%array, KIND=dp)))
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying old ${kind2}$ to new ${kind}$ ${space}$ grid does not work!"
          #:endfor
       #:endfor
 
@@ -227,22 +217,20 @@ CONTAINS
          IF (error > 0.0_dp) &
             ERROR STOP "Copying array ${kind}$ to new ${kind}$ grid does not work!"
 
-         #:if kind[1]=="3"
-            CALL setup_pw_pw(pw_${kind}$_real_old_1)
-            CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+         CALL setup_pw_pw(pw_${kind}$_real_old_1)
+         CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
          error = MAXVAL(ABS(REAL(pw_${kind}$_real_old_1%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$, KIND=dp)))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying old ${kind}$ to array ${kind2}$ grid does not work!"
+         CALL mpi_comm%max(error)
+         IF (error > 0.0_dp) &
+            ERROR STOP "Copying old ${kind}$ to array ${kind2}$ grid does not work!"
 
-            CALL pw_copy_from_array(pw_${kind}$_rec_old_2, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+         CALL pw_copy_from_array(pw_${kind}$_rec_old_2, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
-          error = MAXVAL(ABS(REAL(pw_${kind}$_rec_old_2%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$, KIND=dp)))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying array ${kind}$ to old ${kind}$ grid does not work!"
-         #:endif
+         error = MAXVAL(ABS(REAL(pw_${kind}$_rec_old_2%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$, KIND=dp)))
+         CALL mpi_comm%max(error)
+         IF (error > 0.0_dp) &
+            ERROR STOP "Copying array ${kind}$ to old ${kind}$ grid does not work!"
       #:endfor
 
       WRITE (default_output_unit, "(T3,A)") "Testing pw_copy_to_array and pw_copy_from_array successful!"
@@ -283,16 +271,71 @@ CONTAINS
          ERROR STOP
       END IF
 
+      CALL pw_copy(pw_r3d_real_new_1, pw_r3d_real_old_1)
+! We try to transform and check the integral
+      CALL pw_transfer(pw_r3d_real_old_1, pw_c1d_rec_old_1)
+      tmp = pw_integrate_function(pw_r3d_real_old_1)
+      error = ABS(tmp - pw_integrate_function(pw_c1d_rec_old_1))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new r3d real to old c1d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+
+      error = MAXVAL(ABS(pw_c1d_rec_old_1%cc - pw_c1d_rec_new_1%array))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new r3d real to old c1d reciprocal does not work (2): ", error
+         ERROR STOP
+      END IF
+
       CALL pw_transfer(pw_c1d_rec_new_1, pw_r3d_real_new_2)
       tmp = pw_integrate_function(pw_c1d_rec_new_1)
       error = ABS(tmp - pw_integrate_function(pw_r3d_real_new_2))
       IF (error > 1.0E-12) THEN
-         WRITE (default_output_unit, "(A,T28,F18.10)") "FFT from new r3d real to new c1d reciprocal does not work: ", error
+         WRITE (default_output_unit, "(A,T28,F18.10)") "FFT from new c1d real to new r3d reciprocal does not work: ", error
          ERROR STOP
       END IF
       error = MAXVAL(ABS(pw_r3d_real_new_1%array - pw_r3d_real_new_2%array))
       IF (error > 1.0E-12) THEN
-         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new r3d real to new c1d reciprocal does not work: ", error
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new c1d real to new r3d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+
+      CALL pw_transfer(pw_c1d_rec_new_1, pw_r3d_real_old_2)
+      tmp = pw_integrate_function(pw_c1d_rec_new_1)
+      error = ABS(tmp - pw_integrate_function(pw_r3d_real_old_2))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T28,F18.10)") "FFT from new c1d real to new r3d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+      error = MAXVAL(ABS(pw_r3d_real_old_2%cr3d - pw_r3d_real_new_2%array))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from new c1d real to new r3d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+
+      CALL pw_transfer(pw_c1d_rec_old_1, pw_r3d_real_old_2)
+      tmp = pw_integrate_function(pw_c1d_rec_old_1)
+      error = ABS(tmp - pw_integrate_function(pw_r3d_real_old_2))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T28,F18.10)") "FFT from old c1d real to old r3d reciprocal does not work: ", error
+         ERROR STOP
+      END IF
+      error = MAXVAL(ABS(pw_r3d_real_new_1%array - pw_r3d_real_old_2%cr3d))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from r3d real to c1d reciprocal does not work (2): ", error
+         ERROR STOP
+      END IF
+
+      CALL pw_transfer(pw_c1d_rec_old_1, pw_r3d_real_new_2)
+      tmp = pw_integrate_function(pw_c1d_rec_old_1)
+      error = ABS(tmp - pw_integrate_function(pw_r3d_real_new_2))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T28,F18.10)") "FFT from old c1d reciprocal to new r3d real does not work: ", error
+         ERROR STOP
+      END IF
+      error = MAXVAL(ABS(pw_r3d_real_old_1%cr3d - pw_r3d_real_new_2%array))
+      IF (error > 1.0E-12) THEN
+         WRITE (default_output_unit, "(A,T64,ES18.10)") "FFT from r3d real to c1d reciprocal does not work (2): ", error
          ERROR STOP
       END IF
 
