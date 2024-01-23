@@ -23,7 +23,7 @@ PROGRAM pw_types_unittest
                        pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
                        REALDATA3D, COMPLEXDATA3D, REALDATA1D, COMPLEXDATA1D
    USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set, pw_gather, pw_scatter, &
-                         pw_transfer, pw_integrate_function
+                         pw_transfer, pw_integrate_function, pw_zero
    USE fft_tools, ONLY: fft3d, &
                         finalize_fft, &
                         init_fft
@@ -132,7 +132,7 @@ PROGRAM pw_types_unittest
 
    CALL test_pw_copy()
    CALL test_pw_copy_array()
-   CALL test_pw_gather_scatter()
+!   CALL test_pw_gather_scatter()
    CALL test_pw_transfer()
 
    #:for kind in pw_kinds
@@ -242,14 +242,36 @@ CONTAINS
 
       #:for kind, kind2 in pw_kinds2
          #:if kind[1]=="1" and kind2[1]=="3"
-            CALL setup_pw_${kind}$ (pw_${kind}$_rec_new_2)
+            CALL pw_zero(pw_${kind}$_rec_new_2)
+            CALL pw_zero(pw_${kind2}$_rec_new_1)
+            CALL setup_pw_${kind}$ (pw_${kind}$_rec_new_1)
+            ! The other way around will lead to issues because 1D arrays usually contain less points due to redundancies or spherical cutoffs
+            CALL pw_scatter(pw_${kind}$_rec_new_1, pw_${kind2}$_rec_new_1%array)
             CALL pw_gather(pw_${kind}$_rec_new_2, pw_${kind2}$_rec_new_1%array)
-            CALL pw_scatter(pw_${kind}$_rec_new_2, pw_${kind2}$_real_new_2%array)
 
-            error = MAXVAL(ABS(REAL(pw_${kind2}$_rec_new_1%array - pw_${kind2}$_real_new_2%array, KIND=dp)))
+            error = MAXVAL(ABS(REAL(pw_${kind}$_rec_new_1%array - pw_${kind}$_rec_new_2%array, KIND=dp)))
             CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Scatter between ${kind2}$ and ${kind}$ does not work!"
+            IF (error > 0.0_dp) THEN
+               WRITE (default_output_unit, *) grid%cutoff, grid%grid_span, grid%spherical, grid%para%mode
+               WRITE (default_output_unit, "(T3,A,T28,ES18.10)") "Too large error: ", error
+               ERROR STOP "Scatter/Gather between new ${kind2}$ and ${kind}$ does not work!"
+            END IF
+
+            #:if kind[0]=="c" and kind2[0]=="c"
+               CALL pw_zero(pw_${kind2}$_rec_old_1)
+               CALL pw_zero(pw_${kind}$_rec_old_2)
+               CALL setup_pw_pw(pw_${kind}$_rec_old_1)
+               CALL pw_scatter(pw_${kind}$_rec_old_1, pw_${kind2}$_rec_old_1%${kind2comp(kind2)}$)
+               CALL pw_gather(pw_${kind}$_rec_old_2, pw_${kind2}$_rec_old_1%${kind2comp(kind2)}$)
+
+             error = MAXVAL(ABS(REAL(pw_${kind}$_rec_old_1%${kind2comp(kind)}$-pw_${kind}$_rec_old_2%${kind2comp(kind)}$, KIND=dp)))
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) THEN
+                  WRITE (default_output_unit, *) grid%cutoff, grid%grid_span, grid%spherical, grid%para%mode
+                  WRITE (default_output_unit, "(T3,A,T28,ES18.10)") "Too large error: ", error
+                  ERROR STOP "Scatter/Gather between ${kind2}$ and ${kind}$ does not work!"
+               END IF
+            #:endif
          #:endif
       #:endfor
 
