@@ -40,9 +40,17 @@ MODULE fftw3_lib
 
 #if defined ( __FFTW3 )
 #if defined ( __FFTW3_MKL )
+#if defined (__parallel)
+#include "fft/fftw3-mpi.f03"
+#else
 #include "fftw/fftw3.f03"
+#endif
+#else
+#if defined (__parallel)
+#include "fftw3-mpi.f03"
 #else
 #include "fftw3.f03"
+#endif
 #endif
 #endif
 
@@ -163,7 +171,11 @@ CONTAINS
          END IF
       END IF
 
+#if defined(__parallel)
+      CALL fftw_mpi_cleanup()
+#else
       CALL fftw_cleanup()
+#endif
 #else
       MARK_USED(wisdom_file)
       MARK_USED(ionode)
@@ -207,6 +219,14 @@ CONTAINS
 #elif defined (__MKL)
 ! Preprocessing is enabled by default, and below header is not language specific
 #include <mkl_version.h>
+#endif
+
+!      istat = fftw_init_threads()
+!      IF (istat /= 0) &
+!         CPABORT("Something went wrong while initializing FFTW!")
+
+#if defined(__parallel)
+      CALL fftw_mpi_init()
 #endif
 
       ! Read FFTW wisdom (if available)

@@ -1534,7 +1534,8 @@ CONTAINS
       TYPE(pw_type), DIMENSION(3), OPTIONAL              :: dvhartree
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(OUT), &
          OPTIONAL                                        :: h_stress
-      TYPE(pw_type), INTENT(IN), OPTIONAL                :: rho_core, greenfn, aux_density
+      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL :: rho_core
+      TYPE(pw_type), INTENT(IN), OPTIONAL                :: greenfn, aux_density
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_poisson_solve'
 
