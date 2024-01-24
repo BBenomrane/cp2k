@@ -21,7 +21,7 @@ PROGRAM pw_types_unittest
                        pw_grid_setup
    USE pw_types, ONLY: REALSPACE, RECIPROCALSPACE, &
                        pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
-                       REALDATA3D, COMPLEXDATA3D, REALDATA1D, COMPLEXDATA1D
+                       REALDATA3D, REALDATA1D, COMPLEXDATA1D
    USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set, pw_gather, pw_scatter, &
                          pw_transfer, pw_integrate_function, pw_zero
    USE fft_tools, ONLY: fft3d, &
@@ -97,8 +97,6 @@ PROGRAM pw_types_unittest
    CALL pw_grid_setup(hmat, grid, grid_span=FULLSPACE, npts=(/npts, npts, npts/), fft_usage=.TRUE.) !, iounit=iw)
 
 ! Create some grids
-   CALL pw_c3d_real_old_1%create(grid, COMPLEXDATA3D, REALSPACE)
-   CALL pw_c3d_real_old_2%create(grid, COMPLEXDATA3D, REALSPACE)
    CALL pw_c3d_real_new_1%create(grid, REALSPACE)
    CALL pw_c3d_real_new_2%create(grid, REALSPACE)
    CALL pw_r3d_real_old_1%create(grid, REALDATA3D, REALSPACE)
@@ -113,8 +111,6 @@ PROGRAM pw_types_unittest
    CALL pw_r1d_real_old_2%create(grid, REALDATA1D, REALSPACE)
    CALL pw_r1d_real_new_1%create(grid, REALSPACE)
    CALL pw_r1d_real_new_2%create(grid, REALSPACE)
-   CALL pw_c3d_rec_old_1%create(grid, COMPLEXDATA3D, RECIPROCALSPACE)
-   CALL pw_c3d_rec_old_2%create(grid, COMPLEXDATA3D, RECIPROCALSPACE)
    CALL pw_c3d_rec_new_1%create(grid, RECIPROCALSPACE)
    CALL pw_c3d_rec_new_2%create(grid, RECIPROCALSPACE)
    CALL pw_r3d_rec_old_1%create(grid, REALDATA3D, RECIPROCALSPACE)
@@ -167,26 +163,29 @@ CONTAINS
             IF (error > 0.0_dp) &
                ERROR STOP "Copying new ${kind}$ to new ${kind}$ ${space}$ grid does not work!"
 
-            CALL pw_copy(pw_${kind}$_${space}$_new_2, pw_${kind2}$_${space}$_old_1)
+            #:if kind2 != "c3d"
+               WRITE (default_output_unit, *) "${kind}$", "${kind2}$", "${space}$", pw_${kind}$_${space}$_new_2%in_space, pw_${kind2}$_${space}$_old_1%in_space
+               CALL pw_copy(pw_${kind}$_${space}$_new_2, pw_${kind2}$_${space}$_old_1)
 
            error = MAXVAL(ABS(REAL(pw_${kind}$_${space}$_new_2%array - pw_${kind2}$_${space}$_old_1%${kind2comp(kind2)}$, KIND=dp)))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying new ${kind}$ to old ${kind2}$ ${space}$ grid does not work!"
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) &
+                  ERROR STOP "Copying new ${kind}$ to old ${kind2}$ ${space}$ grid does not work!"
 
-            CALL pw_copy(pw_${kind2}$_${space}$_old_1, pw_${kind2}$_${space}$_old_2)
+               CALL pw_copy(pw_${kind2}$_${space}$_old_1, pw_${kind2}$_${space}$_old_2)
 
             error = MAXVAL(ABS(pw_${kind2}$_${space}$_old_1%${kind2comp(kind2)}$-pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying old ${kind2}$ to old ${kind2}$ ${space}$ grid does not work!"
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) &
+                  ERROR STOP "Copying old ${kind2}$ to old ${kind2}$ ${space}$ grid does not work!"
 
-            CALL pw_copy(pw_${kind2}$_${space}$_old_2, pw_${kind}$_${space}$_new_1)
+               CALL pw_copy(pw_${kind2}$_${space}$_old_2, pw_${kind}$_${space}$_new_1)
 
-            error = MAXVAL(ABS(REAL(pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$-pw_${kind}$_${space}$_new_1%array, KIND=dp)))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) &
-               ERROR STOP "Copying old ${kind2}$ to new ${kind}$ ${space}$ grid does not work!"
+             error = MAXVAL(ABS(REAL(pw_${kind2}$_${space}$_old_2%${kind2comp(kind2)}$-pw_${kind}$_${space}$_new_1%array, KIND=dp)))
+               CALL mpi_comm%max(error)
+               IF (error > 0.0_dp) &
+                  ERROR STOP "Copying old ${kind2}$ to new ${kind}$ ${space}$ grid does not work!"
+            #:endif
          #:endfor
       #:endfor
 
@@ -217,20 +216,22 @@ CONTAINS
          IF (error > 0.0_dp) &
             ERROR STOP "Copying array ${kind}$ to new ${kind}$ grid does not work!"
 
-         CALL setup_pw_pw(pw_${kind}$_real_old_1)
-         CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+         #:if kind != "c3d" and kind2 != "c3d"
+            CALL setup_pw_pw(pw_${kind}$_real_old_1)
+            CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
          error = MAXVAL(ABS(REAL(pw_${kind}$_real_old_1%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$, KIND=dp)))
-         CALL mpi_comm%max(error)
-         IF (error > 0.0_dp) &
-            ERROR STOP "Copying old ${kind}$ to array ${kind2}$ grid does not work!"
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying old ${kind}$ to array ${kind2}$ grid does not work!"
 
-         CALL pw_copy_from_array(pw_${kind}$_rec_old_2, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
+            CALL pw_copy_from_array(pw_${kind}$_rec_old_2, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
-         error = MAXVAL(ABS(REAL(pw_${kind}$_rec_old_2%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$, KIND=dp)))
-         CALL mpi_comm%max(error)
-         IF (error > 0.0_dp) &
-            ERROR STOP "Copying array ${kind}$ to old ${kind}$ grid does not work!"
+          error = MAXVAL(ABS(REAL(pw_${kind}$_rec_old_2%${kind2comp(kind)}$-pw_${kind2}$_real_old_2%${kind2comp(kind2)}$, KIND=dp)))
+            CALL mpi_comm%max(error)
+            IF (error > 0.0_dp) &
+               ERROR STOP "Copying array ${kind}$ to old ${kind}$ grid does not work!"
+         #:endif
       #:endfor
 
       WRITE (default_output_unit, "(T3,A)") "Testing pw_copy_to_array and pw_copy_from_array successful!"
@@ -416,17 +417,10 @@ CONTAINS
    SUBROUTINE setup_pw_pw(pw)
       TYPE(pw_type), INTENT(INOUT) :: pw
       REAL(KIND=dp), DIMENSION(:), ALLOCATABLE :: array_1d, array_1d_2
-      REAL(KIND=dp), DIMENSION(:, :, :), ALLOCATABLE :: array_3d, array_3d_2
 
       SELECT CASE (pw%in_use)
       CASE (REALDATA3D)
          CALL RANDOM_NUMBER(pw%cr3d)
-      CASE (COMPLEXDATA3D)
-         ALLOCATE (array_3d(SIZE(pw%cc3d, 1), SIZE(pw%cc3d, 2), SIZE(pw%cc3d, 3)), &
-                   array_3d_2(SIZE(pw%cc3d, 1), SIZE(pw%cc3d, 2), SIZE(pw%cc3d, 3)))
-         CALL RANDOM_NUMBER(array_3d)
-         CALL RANDOM_NUMBER(array_3d_2)
-         pw%cc3d = CMPLX(array_3d, array_3d_2, KIND=dp)
       CASE (REALDATA1D)
          CALL RANDOM_NUMBER(pw%cr)
       CASE (COMPLEXDATA1D)
