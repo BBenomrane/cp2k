@@ -21,7 +21,7 @@ PROGRAM pw_types_unittest
                        pw_grid_setup
    USE pw_types, ONLY: REALSPACE, RECIPROCALSPACE, &
                        pw_type, pw_c1d_type, pw_r1d_type, pw_r3d_type, pw_c3d_type, &
-                       REALDATA3D, REALDATA1D, COMPLEXDATA1D
+                       REALDATA3D, COMPLEXDATA1D
    USE pw_methods, ONLY: pw_copy, pw_copy_to_array, pw_copy_from_array, pw_set, pw_gather, pw_scatter, &
                          pw_transfer, pw_integrate_function, pw_zero
    USE fft_tools, ONLY: fft3d, &
@@ -107,8 +107,6 @@ PROGRAM pw_types_unittest
    CALL pw_c1d_real_old_2%create(grid, COMPLEXDATA1D, REALSPACE)
    CALL pw_c1d_real_new_1%create(grid, REALSPACE)
    CALL pw_c1d_real_new_2%create(grid, REALSPACE)
-   CALL pw_r1d_real_old_1%create(grid, REALDATA1D, REALSPACE)
-   CALL pw_r1d_real_old_2%create(grid, REALDATA1D, REALSPACE)
    CALL pw_r1d_real_new_1%create(grid, REALSPACE)
    CALL pw_r1d_real_new_2%create(grid, REALSPACE)
    CALL pw_c3d_rec_new_1%create(grid, RECIPROCALSPACE)
@@ -121,14 +119,11 @@ PROGRAM pw_types_unittest
    CALL pw_c1d_rec_old_2%create(grid, COMPLEXDATA1D, RECIPROCALSPACE)
    CALL pw_c1d_rec_new_1%create(grid, RECIPROCALSPACE)
    CALL pw_c1d_rec_new_2%create(grid, RECIPROCALSPACE)
-   CALL pw_r1d_rec_old_1%create(grid, REALDATA1D, RECIPROCALSPACE)
-   CALL pw_r1d_rec_old_2%create(grid, REALDATA1D, RECIPROCALSPACE)
    CALL pw_r1d_rec_new_1%create(grid, RECIPROCALSPACE)
    CALL pw_r1d_rec_new_2%create(grid, RECIPROCALSPACE)
 
    CALL test_pw_copy()
    CALL test_pw_copy_array()
-!   CALL test_pw_gather_scatter()
    CALL test_pw_transfer()
 
    #:for kind in pw_kinds
@@ -163,7 +158,7 @@ CONTAINS
             IF (error > 0.0_dp) &
                ERROR STOP "Copying new ${kind}$ to new ${kind}$ ${space}$ grid does not work!"
 
-            #:if kind2 != "c3d"
+            #:if kind2 != "c3d" and kind2 != "r1d"
                WRITE (default_output_unit, *) "${kind}$", "${kind2}$", "${space}$", pw_${kind}$_${space}$_new_2%in_space, pw_${kind2}$_${space}$_old_1%in_space
                CALL pw_copy(pw_${kind}$_${space}$_new_2, pw_${kind2}$_${space}$_old_1)
 
@@ -216,7 +211,7 @@ CONTAINS
          IF (error > 0.0_dp) &
             ERROR STOP "Copying array ${kind}$ to new ${kind}$ grid does not work!"
 
-         #:if kind != "c3d" and kind2 != "c3d"
+         #:if kind != "c3d" and kind2 != "c3d" and kind != "r1d" and kind2 != "r1d"
             CALL setup_pw_pw(pw_${kind}$_real_old_1)
             CALL pw_copy_to_array(pw_${kind}$_real_old_1, pw_${kind2}$_real_old_2%${kind2comp(kind2)}$)
 
@@ -237,48 +232,6 @@ CONTAINS
       WRITE (default_output_unit, "(T3,A)") "Testing pw_copy_to_array and pw_copy_from_array successful!"
 
    END SUBROUTINE test_pw_copy_array
-
-   SUBROUTINE test_pw_gather_scatter()
-      REAL(KIND=dp) :: error
-
-      #:for kind, kind2 in pw_kinds2
-         #:if kind[1]=="1" and kind2[1]=="3"
-            CALL pw_zero(pw_${kind}$_rec_new_2)
-            CALL pw_zero(pw_${kind2}$_rec_new_1)
-            CALL setup_pw_${kind}$ (pw_${kind}$_rec_new_1)
-            ! The other way around will lead to issues because 1D arrays usually contain less points due to redundancies or spherical cutoffs
-            CALL pw_scatter(pw_${kind}$_rec_new_1, pw_${kind2}$_rec_new_1%array)
-            CALL pw_gather(pw_${kind}$_rec_new_2, pw_${kind2}$_rec_new_1%array)
-
-            error = MAXVAL(ABS(REAL(pw_${kind}$_rec_new_1%array - pw_${kind}$_rec_new_2%array, KIND=dp)))
-            CALL mpi_comm%max(error)
-            IF (error > 0.0_dp) THEN
-               WRITE (default_output_unit, *) grid%cutoff, grid%grid_span, grid%spherical, grid%para%mode
-               WRITE (default_output_unit, "(T3,A,T28,ES18.10)") "Too large error: ", error
-               ERROR STOP "Scatter/Gather between new ${kind2}$ and ${kind}$ does not work!"
-            END IF
-
-            #:if kind[0]=="c" and kind2[0]=="c"
-               CALL pw_zero(pw_${kind2}$_rec_old_1)
-               CALL pw_zero(pw_${kind}$_rec_old_2)
-               CALL setup_pw_pw(pw_${kind}$_rec_old_1)
-               CALL pw_scatter(pw_${kind}$_rec_old_1, pw_${kind2}$_rec_old_1%${kind2comp(kind2)}$)
-               CALL pw_gather(pw_${kind}$_rec_old_2, pw_${kind2}$_rec_old_1%${kind2comp(kind2)}$)
-
-             error = MAXVAL(ABS(REAL(pw_${kind}$_rec_old_1%${kind2comp(kind)}$-pw_${kind}$_rec_old_2%${kind2comp(kind)}$, KIND=dp)))
-               CALL mpi_comm%max(error)
-               IF (error > 0.0_dp) THEN
-                  WRITE (default_output_unit, *) grid%cutoff, grid%grid_span, grid%spherical, grid%para%mode
-                  WRITE (default_output_unit, "(T3,A,T28,ES18.10)") "Too large error: ", error
-                  ERROR STOP "Scatter/Gather between ${kind2}$ and ${kind}$ does not work!"
-               END IF
-            #:endif
-         #:endif
-      #:endfor
-
-      WRITE (default_output_unit, "(T3,A)") "Testing pw_gather and pw_scatter successful!"
-
-   END SUBROUTINE test_pw_gather_scatter
 
    SUBROUTINE test_pw_transfer()
 
@@ -421,8 +374,6 @@ CONTAINS
       SELECT CASE (pw%in_use)
       CASE (REALDATA3D)
          CALL RANDOM_NUMBER(pw%cr3d)
-      CASE (REALDATA1D)
-         CALL RANDOM_NUMBER(pw%cr)
       CASE (COMPLEXDATA1D)
          ALLOCATE (array_1d(SIZE(pw%cc, 1)), array_1d_2(SIZE(pw%cc, 1)))
          CALL RANDOM_NUMBER(array_1d)
