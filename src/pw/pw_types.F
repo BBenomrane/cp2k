@@ -42,7 +42,7 @@ MODULE pw_types
 
    ! Flags for the structure member 'in_use'
    ! NODATA only for internal use, we enforce a certain data type
-   INTEGER, PARAMETER, PUBLIC :: REALDATA1D = 301, COMPLEXDATA1D = 302
+   INTEGER, PARAMETER, PUBLIC :: COMPLEXDATA1D = 302
    INTEGER, PARAMETER, PUBLIC :: REALDATA3D = 303
    INTEGER, PARAMETER         :: NODATA = 305
 
@@ -107,8 +107,6 @@ CONTAINS
       CLASS(pw_type), INTENT(INOUT)                       :: pw
 
       SELECT CASE (pw%in_use)
-      CASE (REALDATA1D)
-         IF (ASSOCIATED(pw%cr)) DEALLOCATE (pw%cr)
       CASE (COMPLEXDATA1D)
          IF (ASSOCIATED(pw%cc)) DEALLOCATE (pw%cc)
       CASE (REALDATA3D)
@@ -135,12 +133,12 @@ CONTAINS
 !>      11.2003 created [fawzi]
 !> \author fawzi
 ! **************************************************************************************************
-   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, r1d_ptr, c1d_ptr, r3d_ptr)
+   SUBROUTINE pw_create(pw, pw_grid, use_data, in_space, c1d_ptr, r3d_ptr)
       CLASS(pw_type), INTENT(INOUT)                         :: pw
       TYPE(pw_grid_type), INTENT(IN), POINTER            :: pw_grid
       INTEGER, INTENT(in)                                :: use_data, in_space
       #:for kind, type in zip(pw_kinds, pw_types)
-         #:if kind != "c3d"
+         #:if kind != "c3d" and kind != "r1d"
             ${type}$, CONTIGUOUS, INTENT(IN), OPTIONAL, POINTER                   :: ${kind}$_ptr
          #:endif
       #:endfor
@@ -164,20 +162,6 @@ CONTAINS
       bounds => pw%pw_grid%bounds_local
 
       SELECT CASE (use_data)
-      CASE (REALDATA1D)
-         IF (PRESENT(r1d_ptr)) THEN
-         IF (ASSOCIATED(r1d_ptr)) THEN
-         IF (ALL(bounds(1, :) <= bounds(2, :))) THEN
-            CPASSERT(LBOUND(r1d_ptr, 1) == 1)
-            CPASSERT(UBOUND(r1d_ptr, 1) == pw%pw_grid%ngpts_cut_local)
-         END IF
-         pw%cr => r1d_ptr
-         END IF
-         END IF
-         IF (.NOT. ASSOCIATED(pw%cr)) THEN
-            ALLOCATE (pw%cr(pw%pw_grid%ngpts_cut_local))
-         END IF
-
       CASE (COMPLEXDATA1D)
          IF (PRESENT(c1d_ptr)) THEN
          IF (ASSOCIATED(c1d_ptr)) THEN
