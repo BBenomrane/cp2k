@@ -36,11 +36,8 @@ MODULE realspace_grid_types
                                               pw_grid_type
    USE pw_grids,                        ONLY: pw_grid_release,&
                                               pw_grid_retain
-   USE pw_methods,                      ONLY: pw_copy_from_array,&
-                                              pw_copy_to_array,&
-                                              pw_integrate_function
-   USE pw_types,                        ONLY: COMPLEXDATA3D,&
-                                              REALDATA3D,&
+   USE pw_methods,                      ONLY: pw_integrate_function
+   USE pw_types,                        ONLY: REALDATA3D,&
                                               pw_type
    USE util,                            ONLY: get_limit
 
@@ -670,41 +667,24 @@ CONTAINS
 
       IF (.NOT. ASSOCIATED(rs%desc%pw, pw%pw_grid)) &
          CPABORT("Different rs and pw indentifiers")
-      IF ((pw%in_use .NE. REALDATA3D) .AND. (pw%in_use .NE. COMPLEXDATA3D)) &
-         CPABORT("Need REALDATA3D or COMPLEXDATA3D")
+      IF (pw%in_use .NE. REALDATA3D) &
+         CPABORT("Need REALDATA3D")
 
       IF (rs%desc%distributed) THEN
          CALL transfer_rs2pw_distributed(rs, pw)
       ELSE IF (rs%desc%parallel) THEN
          CALL transfer_rs2pw_replicated(rs, pw)
       ELSE ! treat simple serial case locally
-         IF (pw%in_use == REALDATA3D) THEN
-            IF (rs%desc%border == 0) THEN
-               CALL dcopy(SIZE(rs%r), rs%r, 1, pw%cr3d, 1)
-            ELSE
-               CPASSERT(LBOUND(pw%cr3d, 3) .EQ. rs%lb_real(3))
-!$OMP          PARALLEL DO DEFAULT(NONE) SHARED(pw,rs)
-               DO i = rs%lb_real(3), rs%ub_real(3)
-                  pw%cr3d(:, :, i) = rs%r(rs%lb_real(1):rs%ub_real(1), &
-                                          rs%lb_real(2):rs%ub_real(2), i)
-               END DO
-!$OMP          END PARALLEL DO
-            END IF
-         ELSEIF (pw%in_use == COMPLEXDATA3D) THEN
-            IF (rs%desc%border == 0) THEN
-               CALL pw_copy_from_array(pw, rs%r)
-            ELSE
-               CPASSERT(LBOUND(pw%cr3d, 3) .EQ. rs%lb_real(3))
-!$OMP          PARALLEL DO DEFAULT(NONE) SHARED(pw,rs)
-               DO i = rs%lb_real(3), rs%ub_real(3)
-                  pw%cc3d(:, :, i) = CMPLX(rs%r(rs%lb_real(1):rs%ub_real(1), &
-                                                rs%lb_real(2):rs%ub_real(2), i), &
-                                           0.0_dp, KIND=dp)
-               END DO
-!$OMP          END PARALLEL DO
-            END IF
+         IF (rs%desc%border == 0) THEN
+            CALL dcopy(SIZE(rs%r), rs%r, 1, pw%cr3d, 1)
          ELSE
-            CPABORT("PW type not compatible")
+            CPASSERT(LBOUND(pw%cr3d, 3) .EQ. rs%lb_real(3))
+!$OMP          PARALLEL DO DEFAULT(NONE) SHARED(pw,rs)
+            DO i = rs%lb_real(3), rs%ub_real(3)
+               pw%cr3d(:, :, i) = rs%r(rs%lb_real(1):rs%ub_real(1), &
+                                       rs%lb_real(2):rs%ub_real(2), i)
+            END DO
+!$OMP          END PARALLEL DO
          END IF
       END IF
 
@@ -732,90 +712,49 @@ CONTAINS
 
       IF (.NOT. ASSOCIATED(rs%desc%pw, pw%pw_grid)) &
          CPABORT("Different rs and pw indentifiers")
-      IF ((pw%in_use .NE. REALDATA3D) .AND. (pw%in_use .NE. COMPLEXDATA3D)) &
-         CPABORT("Need REALDATA3D or COMPLEXDATA3D")
+      IF (pw%in_use .NE. REALDATA3D) &
+         CPABORT("Need REALDATA3D")
 
       IF (rs%desc%distributed) THEN
          CALL transfer_pw2rs_distributed(rs, pw)
       ELSE IF (rs%desc%parallel) THEN
          CALL transfer_pw2rs_replicated(rs, pw)
       ELSE ! treat simple serial case locally
-         IF (pw%in_use == REALDATA3D) THEN
-            IF (rs%desc%border == 0) THEN
-               CALL dcopy(SIZE(rs%r), pw%cr3d, 1, rs%r, 1)
-            ELSE
-!$OMP          PARALLEL DO DEFAULT(NONE) &
-!$OMP                      PRIVATE(i,im,j,jm,k,km) &
-!$OMP                      SHARED(pw,rs)
-               DO k = rs%lb_local(3), rs%ub_local(3)
-                  IF (k < rs%lb_real(3)) THEN
-                     km = k + rs%desc%npts(3)
-                  ELSE IF (k > rs%ub_real(3)) THEN
-                     km = k - rs%desc%npts(3)
-                  ELSE
-                     km = k
-                  END IF
-                  DO j = rs%lb_local(2), rs%ub_local(2)
-                     IF (j < rs%lb_real(2)) THEN
-                        jm = j + rs%desc%npts(2)
-                     ELSE IF (j > rs%ub_real(2)) THEN
-                        jm = j - rs%desc%npts(2)
-                     ELSE
-                        jm = j
-                     END IF
-                     DO i = rs%lb_local(1), rs%ub_local(1)
-                        IF (i < rs%lb_real(1)) THEN
-                           im = i + rs%desc%npts(1)
-                        ELSE IF (i > rs%ub_real(1)) THEN
-                           im = i - rs%desc%npts(1)
-                        ELSE
-                           im = i
-                        END IF
-                        rs%r(i, j, k) = pw%cr3d(im, jm, km)
-                     END DO
-                  END DO
-               END DO
-!$OMP          END PARALLEL DO
-            END IF
-         ELSEIF (pw%in_use == COMPLEXDATA3D) THEN
-            IF (rs%desc%border == 0) THEN
-               CALL pw_copy_to_array(pw, rs%r)
-            ELSE
-!$OMP          PARALLEL DO DEFAULT(NONE) &
-!$OMP                      PRIVATE(i,im,j,jm,k,km) &
-!$OMP                      SHARED(pw,rs)
-               DO k = rs%lb_local(3), rs%ub_local(3)
-                  IF (k < rs%lb_real(3)) THEN
-                     km = k + rs%desc%npts(3)
-                  ELSE IF (k > rs%ub_real(3)) THEN
-                     km = k - rs%desc%npts(3)
-                  ELSE
-                     km = k
-                  END IF
-                  DO j = rs%lb_local(2), rs%ub_local(2)
-                     IF (j < rs%lb_real(2)) THEN
-                        jm = j + rs%desc%npts(2)
-                     ELSE IF (j > rs%ub_real(2)) THEN
-                        jm = j - rs%desc%npts(2)
-                     ELSE
-                        jm = j
-                     END IF
-                     DO i = rs%lb_local(1), rs%ub_local(1)
-                        IF (i < rs%lb_real(1)) THEN
-                           im = i + rs%desc%npts(1)
-                        ELSE IF (i > rs%ub_real(1)) THEN
-                           im = i - rs%desc%npts(1)
-                        ELSE
-                           im = i
-                        END IF
-                        rs%r(i, j, k) = REAL(pw%cc3d(im, jm, km), KIND=dp)
-                     END DO
-                  END DO
-               END DO
-!$OMP          END PARALLEL DO
-            END IF
+         IF (rs%desc%border == 0) THEN
+            CALL dcopy(SIZE(rs%r), pw%cr3d, 1, rs%r, 1)
          ELSE
-            CPABORT("PW type not compatible")
+!$OMP          PARALLEL DO DEFAULT(NONE) &
+!$OMP                      PRIVATE(i,im,j,jm,k,km) &
+!$OMP                      SHARED(pw,rs)
+            DO k = rs%lb_local(3), rs%ub_local(3)
+               IF (k < rs%lb_real(3)) THEN
+                  km = k + rs%desc%npts(3)
+               ELSE IF (k > rs%ub_real(3)) THEN
+                  km = k - rs%desc%npts(3)
+               ELSE
+                  km = k
+               END IF
+               DO j = rs%lb_local(2), rs%ub_local(2)
+                  IF (j < rs%lb_real(2)) THEN
+                     jm = j + rs%desc%npts(2)
+                  ELSE IF (j > rs%ub_real(2)) THEN
+                     jm = j - rs%desc%npts(2)
+                  ELSE
+                     jm = j
+                  END IF
+                  DO i = rs%lb_local(1), rs%ub_local(1)
+                     IF (i < rs%lb_real(1)) THEN
+                        im = i + rs%desc%npts(1)
+                     ELSE IF (i > rs%ub_real(1)) THEN
+                        im = i - rs%desc%npts(1)
+                     ELSE
+                        im = i
+                     END IF
+                     rs%r(i, j, k) = pw%cr3d(im, jm, km)
+                  END DO
+               END DO
+            END DO
+!$OMP          END PARALLEL DO
          END IF
       END IF
 
@@ -885,13 +824,7 @@ CONTAINS
          nn = rcount(mepos)
       END ASSOCIATE
 
-      IF (pw%in_use == REALDATA3D) THEN
-         CALL dcopy(nn, sendbuf, 1, pw%cr3d, 1)
-      ELSEIF (pw%in_use == COMPLEXDATA3D) THEN
-         CALL pw_copy_from_array(pw, RESHAPE(sendbuf, SHAPE(pw%cc3d)))
-      ELSE
-         CPABORT("PW type not compatible")
-      END IF
+      CALL dcopy(nn, sendbuf, 1, pw%cr3d, 1)
 
       DEALLOCATE (rcount)
       DEALLOCATE (sendbuf)
@@ -930,13 +863,7 @@ CONTAINS
          CALL m_memory()
 
          nn = rcount(mepos)
-         IF (pw%in_use == REALDATA3D) THEN
-            CALL dcopy(nn, pw%cr3d, 1, sendbuf, 1)
-         ELSEIF (pw%in_use == COMPLEXDATA3D) THEN
-            CALL dcopy(nn, TRANSFER(pw%cc3d, sendbuf), 2, sendbuf, 1)
-         ELSE
-            CPABORT("PW type not compatible")
-         END IF
+         CALL dcopy(nn, pw%cr3d, 1, sendbuf, 1)
 
          dest = MODULO(mepos + 1, np)
          source = MODULO(mepos - 1, np)
