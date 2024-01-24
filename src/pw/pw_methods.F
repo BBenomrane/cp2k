@@ -963,10 +963,10 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                   #:endif
                ELSE
-                  CPABORT("")!No suitable data field")
+                  CPABORT("No suitable data field")
                END IF
             ELSE
-               CPABORT("")!Incompatible grids")
+               CPABORT("Incompatible grids")
             END IF
          ELSE
             IF (.FALSE.) THEN
@@ -1005,7 +1005,7 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                #:endif
             ELSE
-               CPABORT("")!No suitable data field")
+               CPABORT("No suitable data field")
             END IF
          END IF
          CALL timestop(handle)
@@ -1045,13 +1045,13 @@ CONTAINS
                         pw2%array(ng + 1:ng2) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
 !$OMP END PARALLEL WORKSHARE
                      ELSE
-                        CPABORT("")!No suitable data field")
+                        CPABORT("No suitable data field")
                      END IF
                   #:else
                      CPABORT("")
                   #:endif
                ELSE
-                  CPABORT("")!Incompatible grids")
+                  CPABORT("Incompatible grids")
                END IF
 
             ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
@@ -1113,10 +1113,10 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                   #:endif
                ELSE
-                  CPABORT("")!No suitable data field")
+                  CPABORT("No suitable data field")
                END IF
             ELSE
-               CPABORT("")!Incompatible grids")
+               CPABORT("Incompatible grids")
             END IF
          ELSE
             IF (.FALSE.) THEN
@@ -1153,7 +1153,7 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                #:endif
             ELSE
-               CPABORT("")!No suitable data field")
+               CPABORT("No suitable data field")
             END IF
          END IF
          CALL timestop(handle)
@@ -2347,7 +2347,7 @@ CONTAINS
                            IF (pw1%in_space /= pw2%in_space) &
                               CPABORT("Both grids must be in the same space!")
                            IF (pw1%pw_grid%spherical .neqv. pw2%pw_grid%spherical) &
-                              CPABORT("")!Both grids must be either spherical or non-spherical!")
+                              CPABORT("Both grids must be either spherical or non-spherical!")
 
                            #:if kind[1]=='1'
                               IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
@@ -2407,7 +2407,7 @@ CONTAINS
                                           #:if kind=='c1d' and kind2=='c1d'
                                              CALL pw_copy_match(pw1, pw2)
                                           #:else
-                                             CPABORT("")!Copy not implemented!")
+                                             CPABORT("Copy not implemented!")
                                           #:endif
                                        END IF
                                     END IF
@@ -2601,7 +2601,7 @@ CONTAINS
 !$OMP END PARALLEL DO
                                     END IF
                                  ELSE
-                                    CPABORT("")!Grids not compatible")
+                                    CPABORT("Grids not compatible")
                                  END IF
                                  #:else
                                  IF (ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
@@ -2618,7 +2618,7 @@ CONTAINS
                                  ELSE IF (pw_compatible(pw1%pw_grid, pw2%pw_grid) .OR. my_allow_noncompatible_grids) THEN
 
                                     IF (ANY(SHAPE(pw1%array) /= SHAPE(pw2%array))) &
-                                       CPABORT("")!Noncommensurate grids not implemented for 3D grids!")
+                                       CPABORT("Noncommensurate grids not implemented for 3D grids!")
 
                                     IF (my_alpha == 1.0_dp) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
@@ -2633,7 +2633,7 @@ CONTAINS
 
                                  ELSE
 
-                                    CPABORT("")!Grids not compatible")
+                                    CPABORT("Grids not compatible")
 
                                  END IF
 
@@ -2668,7 +2668,7 @@ CONTAINS
                                     IF (PRESENT(alpha)) my_alpha = alpha
 
                              IF (.NOT. ASSOCIATED(pw_out%pw_grid, pw1%pw_grid) .OR. .NOT. ASSOCIATED(pw_out%pw_grid, pw2%pw_grid)) &
-                                       CPABORT("")!pw_multiply not implemented for non-identical grids!")
+                                       CPABORT("pw_multiply not implemented for non-identical grids!")
 
                                     IF (my_alpha == 1.0_dp) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw_out, pw1, pw2)
@@ -2700,9 +2700,9 @@ CONTAINS
                                     CALL timeset(routineN, handle)
 
                                     IF (pw1%in_space /= pw2%in_space) &
-                                       CPABORT("")!Invalid space combination!")
+                                       CPABORT("Invalid space combination!")
                                     IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) &
-                                       CPABORT("")!Incompatible grids!")
+                                       CPABORT("Incompatible grids!")
 
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
                                     pw1%array = pw1%array*${type2type("pw2%array", kind2, kind)}$
@@ -2747,7 +2747,7 @@ CONTAINS
                                     IF (PRESENT(local_only)) my_local_only = local_only
 
                                     IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-                                       CPABORT("")!Grids incompatible")
+                                       CPABORT("Grids incompatible")
                                     END IF
 
                                     my_just_sum = .FALSE.
@@ -2837,10 +2837,10 @@ CONTAINS
                                           CALL timeset(routineN, handle)
 
                                           IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-                                             CPABORT("")!Grids incompatible")
+                                             CPABORT("Grids incompatible")
                                           END IF
                                           IF (pw1%in_space /= RECIPROCALSPACE .OR. pw2%in_space /= RECIPROCALSPACE) &
-                                             CPABORT("")!Grids must be in reciprocal space!")
+                                             CPABORT("Grids must be in reciprocal space!")
 
                                           #:if kind[0]=="c"
                                              #:if kind2[0]=="c"
@@ -2899,7 +2899,7 @@ CONTAINS
                                              #:if kind[1:]==kind2[1:]
                                                 CALL pw_copy_${kind}$_${kind2}$ (pw1, pw2)
                                              #:else
-                                                CPABORT("")!Type combinatipn not supported!")
+                                                CPABORT("Type combinatipn not supported!")
                                              #:endif
 
                                           ELSE IF (pw1%in_space == RECIPROCALSPACE .AND. &
@@ -2916,7 +2916,7 @@ CONTAINS
                                              #:elif kind2[1]=="1"
                                                 CALL pw_gather_s_${kind2}$_${kind}$ (pw2, pw1%array)
                                              #:else
-                                                CPABORT("")!Do not know what to do")
+                                                CPABORT("Do not know what to do")
                                              #:endif
 
                                           ELSE
@@ -2982,10 +2982,10 @@ CONTAINS
                                           !..check if grids are compatible
                                           IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
                                              IF (pw1%pw_grid%dvol /= pw2%pw_grid%dvol) THEN
-                                                CPABORT("")!PW grids not compatible")
+                                                CPABORT("PW grids not compatible")
                                              END IF
                                              IF (pw1%pw_grid%para%group /= pw2%pw_grid%para%group) THEN
-                                                CPABORT("")!PW grids have not compatible MPI groups")
+                                                CPABORT("PW grids have not compatible MPI groups")
                                              END IF
                                           END IF
 
@@ -2999,7 +2999,7 @@ CONTAINS
                                              norm = 1.0_dp
                                              out_space = REALSPACE
                                           ELSE
-                                             CPABORT("")!Error in space tag")
+                                             CPABORT("Error in space tag")
                                           END IF
 
                                           n => pw1%pw_grid%npts
@@ -3303,7 +3303,7 @@ CONTAINS
                                                    CALL timeset(routineN, handle)
 
                                                    IF (pw%in_space /= RECIPROCALSPACE) &
-                                                      CPABORT("")!Grid has to be in reciprocal space!")
+                                                      CPABORT("Grid has to be in reciprocal space!")
 
                                  ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
                                                               ngpts => SIZE(pw%pw_grid%gsq), ghat => pw%pw_grid%g_hat)
@@ -3356,7 +3356,7 @@ CONTAINS
                                                    CALL timeset(routineN, handle)
 
                                                    IF (pw%in_space /= RECIPROCALSPACE) THEN
-                                                      CPABORT("")!Data has to be in RECIPROCALSPACE")
+                                                      CPABORT("Data has to be in RECIPROCALSPACE")
                                                    END IF
 
                                  ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
@@ -3452,7 +3452,7 @@ CONTAINS
                                                 pw%cr3d(:, :, :) = 0.0_dp
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!No possible data field!")
+                                                CPABORT("No possible data field!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3512,7 +3512,7 @@ CONTAINS
                                                          END IF
                                                          ns = 2*MAX(ng1, ng2)
                                                       ELSE
-                                                         CPABORT("")!No suitable data field")
+                                                         CPABORT("No suitable data field")
                                                       END IF
 
                                                    ELSE
@@ -3526,7 +3526,7 @@ CONTAINS
                                                             " spherical :", pw2%pw_grid%spherical, &
                                                             " reference :", pw2%pw_grid%reference
                                                       END IF
-                                                      CPABORT("")!Incompatible grids")
+                                                      CPABORT("Incompatible grids")
                                                    END IF
 
                                                 ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
@@ -3592,7 +3592,7 @@ CONTAINS
                                                       pw2%cr3d(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
                                                    ELSE
-                                                      CPABORT("")!No suitable data field")
+                                                      CPABORT("No suitable data field")
                                                    END IF
 
                                                 ELSE
@@ -3608,7 +3608,7 @@ CONTAINS
                                                          " reference :", pw2%pw_grid%reference
                                                    END IF
 
-                                                   CPABORT("")!Incompatible grids")
+                                                   CPABORT("Incompatible grids")
 
                                                 END IF
 
@@ -3635,7 +3635,7 @@ CONTAINS
                                                    pw2%cr3d(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
                                                 ELSE
-                                                   CPABORT("")!No suitable data field")
+                                                   CPABORT("No suitable data field")
                                                 END IF
 
                                              END IF
@@ -3664,7 +3664,7 @@ CONTAINS
                                                 array = pw%cr3d
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3694,7 +3694,7 @@ CONTAINS
                                                 array = REAL(pw%cc, KIND=dp)
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3721,7 +3721,7 @@ CONTAINS
                                                 array = pw%cr3d
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3752,7 +3752,7 @@ CONTAINS
                                                 array = pw%cc
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3778,7 +3778,7 @@ CONTAINS
                                                 pw%cr3d = array
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3808,7 +3808,7 @@ CONTAINS
                                                 pw%cc = array
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3834,7 +3834,7 @@ CONTAINS
                                                 pw%cr3d = REAL(array, KIND=dp)
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3864,7 +3864,7 @@ CONTAINS
                                                 pw%cc = array
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!PW grid must be 3D!")
+                                                CPABORT("PW grid must be 3D!")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3902,7 +3902,7 @@ CONTAINS
                                                 pw%cr3d(:, :, :) = a*pw%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
                                              CASE DEFAULT
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
                                              END SELECT
 
                                              CALL timestop(handle)
@@ -3946,7 +3946,7 @@ CONTAINS
                                                 pw%cc(:) = pw%cc(:)*EXP(-pw%pw_grid%gsq(:)*omega_2)
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
                                              END IF
 
                                              CALL timestop(handle)
@@ -3986,7 +3986,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4040,7 +4040,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4088,7 +4088,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4136,7 +4136,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4182,7 +4182,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4235,7 +4235,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4283,7 +4283,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4315,10 +4315,10 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (ANY(n < 0)) &
-                                                CPABORT("")!Nonnegative exponents are not supported!")
+                                                CPABORT("Nonnegative exponents are not supported!")
 
                                              IF (pw%in_space /= RECIPROCALSPACE) &
-                                                CPABORT("")!Grid must be in reciprocal space!")
+                                                CPABORT("Grid must be in reciprocal space!")
 
                                              m = SUM(n)
                                              im = CMPLX(0.0_dp, 1.0_dp, KIND=dp)**m
@@ -4436,7 +4436,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4473,7 +4473,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4529,7 +4529,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4589,7 +4589,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4636,7 +4636,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -4690,7 +4690,7 @@ CONTAINS
                                                    ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
                                                       CALL pw_gather(pw2, pw1%cc3d)
                                                    ELSE
-                                                      CPABORT("")!Do not know what to do")
+                                                      CPABORT("Do not know what to do")
                                                    END IF
 
                                                 END IF
@@ -4749,7 +4749,7 @@ CONTAINS
                                     IF (PRESENT(allow_noncompatible_grids)) my_allow_noncompatible_grids = allow_noncompatible_grids
 
                                              IF (pw1%in_space /= pw2%in_space) &
-                                                CPABORT("")!Both grids must be in the same space for axpy!")
+                                                CPABORT("Both grids must be in the same space for axpy!")
 
                                              IF (my_beta /= 1.0_dp) THEN
                                                 IF (my_beta == 0.0_dp) THEN
@@ -4768,7 +4768,7 @@ CONTAINS
                                                       pw2%cc = pw2%cc*my_beta
 !$OMP END PARALLEL WORKSHARE
                                                    ELSE
-                                                      CPABORT("")!Unknown array type in use for PW!")
+                                                      CPABORT("Unknown array type in use for PW!")
                                                    END IF
                                                 END IF
                                              END IF
@@ -4815,7 +4815,7 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                                                    END IF
                                                 ELSE
-                                                   CPABORT("")!No suitable data field")
+                                                   CPABORT("No suitable data field")
                                                 END IF
 
                                             ELSE IF (pw_compatible(pw1%pw_grid, pw2%pw_grid) .OR. my_allow_noncompatible_grids) THEN
@@ -4924,7 +4924,7 @@ CONTAINS
                                                             " sperical :", pw2%pw_grid%spherical, &
                                                             " reference :", pw2%pw_grid%reference
                                                       END IF
-                                                      CPABORT("")!Grids not compatible")
+                                                      CPABORT("Grids not compatible")
 
                                                    END IF
 
@@ -4946,7 +4946,7 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                                                    END IF
                                                 ELSE
-                                                   CPABORT("")!No suitable data field")
+                                                   CPABORT("No suitable data field")
                                                 END IF
 
                                              ELSE
@@ -4962,7 +4962,7 @@ CONTAINS
                                                       " reference :", pw2%pw_grid%reference
                                                 END IF
 
-                                                CPABORT("")!Grids not compatible")
+                                                CPABORT("Grids not compatible")
 
                                              END IF
 
@@ -5045,11 +5045,11 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                                                    END IF
                                                 ELSE
-                                                   CPABORT("")!No suitable data field")
+                                                   CPABORT("No suitable data field")
                                                 END IF
 
                                              ELSE
-                                                CPABORT("")!Grids not compatible")
+                                                CPABORT("Grids not compatible")
                                              END IF
 
                                              CALL timestop(handle)
@@ -5078,11 +5078,11 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (pw%in_use /= COMPLEXDATA1D) THEN
-                                                CPABORT("")!Data field has to be COMPLEXDATA1D")
+                                                CPABORT("Data field has to be COMPLEXDATA1D")
                                              END IF
 
                                              IF (pw%in_space /= RECIPROCALSPACE) &
-                                                CPABORT("")!Grid has to be in reciprocal space!")
+                                                CPABORT("Grid has to be in reciprocal space!")
 
                                  ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
                                                         ngpts => SIZE(pw%pw_grid%gsq), ghat => pw%pw_grid%g_hat)
@@ -5132,15 +5132,15 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (pw%in_use /= COMPLEXDATA1D) THEN
-                                                CPABORT("")!Data field has to be COMPLEXDATA1D")
+                                                CPABORT("Data field has to be COMPLEXDATA1D")
                                              END IF
 
                                              IF (pw%pw_grid%para%mode /= PW_MODE_DISTRIBUTED) THEN
-                                                CPABORT("")!This grid type is not distributed")
+                                                CPABORT("This grid type is not distributed")
                                              END IF
 
                                              IF (pw%in_space /= RECIPROCALSPACE) &
-                                                CPABORT("")!Grid mus be in reciprocal space!")
+                                                CPABORT("Grid mus be in reciprocal space!")
 
                                  ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
                                                 ngpts => SIZE(pw%pw_grid%gsq), ghat => pw%pw_grid%g_hat, yzq => pw%pw_grid%para%yzq)
@@ -5200,11 +5200,11 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (pw%in_use /= COMPLEXDATA1D) THEN
-                                                CPABORT("")!Data field has to be COMPLEXDATA1D")
+                                                CPABORT("Data field has to be COMPLEXDATA1D")
                                              END IF
 
                                              IF (pw%in_space /= RECIPROCALSPACE) THEN
-                                                CPABORT("")!Data has to be in RECIPROCALSPACE")
+                                                CPABORT("Data has to be in RECIPROCALSPACE")
                                              END IF
 
                                  ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
@@ -5287,15 +5287,15 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (pw%in_use /= COMPLEXDATA1D) THEN
-                                                CPABORT("")!Data field has to be COMPLEXDATA1D")
+                                                CPABORT("Data field has to be COMPLEXDATA1D")
                                              END IF
 
                                              IF (pw%in_space /= RECIPROCALSPACE) THEN
-                                                CPABORT("")!Data has to be in RECIPROCALSPACE")
+                                                CPABORT("Data has to be in RECIPROCALSPACE")
                                              END IF
 
                                              IF (pw%pw_grid%para%mode /= PW_MODE_DISTRIBUTED) THEN
-                                                CPABORT("")!This grid type is not distributed")
+                                                CPABORT("This grid type is not distributed")
                                              END IF
 
                                  ASSOCIATE (mapl => pw%pw_grid%mapl%pos, mapm => pw%pw_grid%mapm%pos, mapn => pw%pw_grid%mapn%pos, &
@@ -5419,10 +5419,10 @@ CONTAINS
                                              !..check if grids are compatible
                                              IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
                                                 IF (pw1%pw_grid%dvol /= pw2%pw_grid%dvol) THEN
-                                                   CPABORT("")!PW grids not compatible")
+                                                   CPABORT("PW grids not compatible")
                                                 END IF
                                                 IF (pw1%pw_grid%para%group /= pw2%pw_grid%para%group) THEN
-                                                   CPABORT("")!PW grids have not compatible MPI groups")
+                                                   CPABORT("PW grids have not compatible MPI groups")
                                                 END IF
                                              END IF
 
@@ -5436,7 +5436,7 @@ CONTAINS
                                                 norm = 1.0_dp
                                                 out_space = REALSPACE
                                              ELSE
-                                                CPABORT("")!Error in space tag")
+                                                CPABORT("Error in space tag")
                                              END IF
 
                                              n => pw1%pw_grid%npts
@@ -5466,7 +5466,7 @@ CONTAINS
 
                                                 SELECT CASE (mode)
                                                 CASE DEFAULT
-                                                   CPABORT("")!Illegal combination of in_use and in_space")
+                                                   CPABORT("Illegal combination of in_use and in_space")
                                                 CASE ("FW_C3DC3D")
                                                    c_in => pw1%cc3d
                                                    c_out => pw2%cc3d
@@ -5736,7 +5736,7 @@ CONTAINS
                                              ELSE IF (space1 == RECIPROCALSPACE) THEN
                                                 mode(1:3) = "BW_"
                                              ELSE
-                                                CPABORT("")!Error in space tag")
+                                                CPABORT("Error in space tag")
                                              END IF
 
                                              SELECT CASE (use1)
@@ -5747,7 +5747,7 @@ CONTAINS
                                              CASE (REALDATA1D)
                                                 mode(4:6) = "R1D"
                                              CASE DEFAULT
-                                                CPABORT("")!Error in use1 tag")
+                                                CPABORT("Error in use1 tag")
                                              END SELECT
 
                                              SELECT CASE (use2)
@@ -5758,7 +5758,7 @@ CONTAINS
                                              CASE (REALDATA1D)
                                                 mode(7:9) = "R1D"
                                              CASE DEFAULT
-                                                CPABORT("")!Error in use1 tag")
+                                                CPABORT("Error in use1 tag")
                                              END SELECT
 
                                           END FUNCTION fftselect
@@ -5885,7 +5885,7 @@ CONTAINS
                                              IF (PRESENT(local_only)) my_local_only = local_only
 
                                              IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-                                                CPABORT("")!Grids incompatible")
+                                                CPABORT("Grids incompatible")
                                              END IF
 
                                              my_just_sum = .FALSE.
@@ -5923,7 +5923,7 @@ CONTAINS
                                                    integral_value = REAL(DOT_PRODUCT(CONJG(pw1%cc(:)), CONJG(pw2%cc(:))), KIND=dp) !? complex bit
 !$OMP END PARALLEL WORKSHARE
                                                 ELSE
-                                                   CPABORT("")!No possible DATA")
+                                                   CPABORT("No possible DATA")
                                                 END IF
 
                                              ELSE
@@ -5947,7 +5947,7 @@ CONTAINS
                                                          .AND. pw2%in_use == COMPLEXDATA1D) THEN
                                                    integral_value = REAL(accurate_sum(CONJG(pw1%cc(:))*pw2%cc(:)), KIND=dp) !? complex bit
                                                 ELSE
-                                                   CPABORT("")!No possible DATA")
+                                                   CPABORT("No possible DATA")
                                                 END IF
 
                                              END IF
@@ -5992,7 +5992,7 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-                                                CPABORT("")!Grids incompatible")
+                                                CPABORT("Grids incompatible")
                                              END IF
 
                                              IF (pw1%in_use == REALDATA1D .AND. &
@@ -6007,7 +6007,7 @@ CONTAINS
                                                    integral_value = 2.0_dp*integral_value
                                                 END IF
                                              ELSE
-                                                CPABORT("")!No possible DATA")
+                                                CPABORT("No possible DATA")
                                              END IF
 
                                              IF (pw1%in_space == REALSPACE) THEN
@@ -6058,7 +6058,7 @@ CONTAINS
 
                                              ELSE
 
-                                                CPABORT("")!No suitable data field")
+                                                CPABORT("No suitable data field")
 
                                              END IF
 
@@ -6089,7 +6089,7 @@ CONTAINS
                                                 CASE ("ABS", "abs")
                                                    iop = 1
                                                 CASE DEFAULT
-                                                   CPABORT("")!Unknown operator")
+                                                   CPABORT("Unknown operator")
                                                 END SELECT
                                              END IF
 
@@ -6104,18 +6104,18 @@ CONTAINS
                                                       total_fun = fun%pw_grid%dvol*accurate_sum(fun%cr3d)
                                                    END IF
                                                 ELSE
-                                                   CPABORT("")!In_space/in_use combination not implemented")
+                                                   CPABORT("In_space/in_use combination not implemented")
                                                 END IF
                                              ELSE IF (fun%in_space == RECIPROCALSPACE) THEN
                                                 IF (iop == 1) &
-                                                   CPABORT("")!Operator ABS not implemented")
+                                                   CPABORT("Operator ABS not implemented")
                                                 IF (fun%in_use == COMPLEXDATA1D) THEN
                                                    IF (fun%pw_grid%have_g0) total_fun = REAL(fun%pw_grid%vol*fun%cc(1), KIND=dp)
                                                 ELSE
-                                                   CPABORT("")!In_space/in_use combination not implemented")
+                                                   CPABORT("In_space/in_use combination not implemented")
                                                 END IF
                                              ELSE
-                                                CPABORT("")!No space defined")
+                                                CPABORT("No space defined")
                                              END IF
 
                                              IF (fun%pw_grid%para%mode /= PW_MODE_LOCAL) THEN
@@ -6148,7 +6148,7 @@ CONTAINS
                                                 pw%cr3d = value
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!Illegal pw type, should be REALDATA3D.")
+                                                CPABORT("Illegal pw type, should be REALDATA3D.")
                                              END IF
                                              CALL timestop(handle)
 
@@ -6170,9 +6170,9 @@ CONTAINS
                                              CALL timeset(routineN, handle)
 
                                              IF (pw1%in_space /= pw2%in_space) &
-                                                CPABORT("")!Invalid space combination!")
+                                                CPABORT("Invalid space combination!")
                                              IF (.NOT. pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
-                                                CPABORT("")!Incompatible grids!")
+                                                CPABORT("Incompatible grids!")
 
                                              IF (pw1%in_use == REALDATA1D .AND. pw2%in_use == REALDATA1D) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
@@ -6191,7 +6191,7 @@ CONTAINS
                                                 pw1%cc = pw1%cc*pw2%cr
 !$OMP END PARALLEL WORKSHARE
                                              ELSE
-                                                CPABORT("")!Invalid combination of grids!")
+                                                CPABORT("Invalid combination of grids!")
                                              END IF
                                              CALL timestop(handle)
 
