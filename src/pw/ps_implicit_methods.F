@@ -2427,7 +2427,7 @@ CONTAINS
 
       CALL pw_transfer(pw_in, pw_in_gs)
       DO ig = 1, ng
-         pw_in_gs%array(ig) = prefactor*pw_in_gs%array(ig)*green%influence_fn%cc(ig)
+         pw_in_gs%array(ig) = prefactor*pw_in_gs%array(ig)*green%influence_fn%array(ig)
       END DO
       CALL pw_transfer(pw_in_gs, pw_out)
 
@@ -2474,7 +2474,7 @@ CONTAINS
 
       CALL pw_transfer(pw_in, pw_in_gs)
       DO ig = 1, ng
-         pw_in_gs%cc(ig) = prefactor*pw_in_gs%cc(ig)*green%influence_fn%cc(ig)
+         pw_in_gs%cc(ig) = prefactor*pw_in_gs%cc(ig)*green%influence_fn%array(ig)
       END DO
       CALL pw_transfer(pw_in_gs, pw_out)
 
@@ -2624,7 +2624,7 @@ CONTAINS
          pw_in_gs%array(g0_index) = 0.0_dp
       END IF
       DO ig = green%influence_fn%pw_grid%first_gne0, ng
-         pw_in_gs%array(ig) = prefactor*(pw_in_gs%array(ig)/green%influence_fn%cc(ig))
+         pw_in_gs%array(ig) = prefactor*(pw_in_gs%array(ig)/green%influence_fn%array(ig))
       END DO
 
       CALL pw_transfer(pw_in_gs, pw_out)
@@ -2679,7 +2679,7 @@ CONTAINS
          pw_in_gs%cc(g0_index) = 0.0_dp
       END IF
       DO ig = green%influence_fn%pw_grid%first_gne0, ng
-         pw_in_gs%cc(ig) = prefactor*(pw_in_gs%cc(ig)/green%influence_fn%cc(ig))
+         pw_in_gs%cc(ig) = prefactor*(pw_in_gs%cc(ig)/green%influence_fn%array(ig))
       END DO
 
       CALL pw_transfer(pw_in_gs, pw_out)
