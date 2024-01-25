@@ -417,6 +417,7 @@ CONTAINS
                IF (PRESENT(greenfn)) THEN
                   influence_fn = greenfn
                ELSE
+                  influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
                   influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
                   influence_fn%array => poisson_env%green_fft%influence_fn%cc
                END IF
@@ -696,6 +697,7 @@ CONTAINS
                   IF (PRESENT(greenfn)) THEN
                      influence_fn = greenfn
                   ELSE
+                     influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
                      influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
                      influence_fn%array => poisson_env%green_fft%influence_fn%cc
                   END IF
@@ -997,6 +999,7 @@ CONTAINS
                   IF (PRESENT(greenfn)) THEN
                      influence_fn = greenfn
                   ELSE
+                     influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
                      influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
                      influence_fn%array => poisson_env%green_fft%influence_fn%cc
                   END IF
@@ -1277,6 +1280,7 @@ CONTAINS
                      IF (PRESENT(greenfn)) THEN
                         influence_fn = greenfn
                      ELSE
+                        influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
                         influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
                         influence_fn%array => poisson_env%green_fft%influence_fn%cc
                      END IF
