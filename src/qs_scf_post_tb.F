@@ -1305,7 +1305,7 @@ CONTAINS
                TYPE(pw_grid_type), POINTER                        :: pwdummy
                NULLIFY (pwdummy)
                CALL pw_green_create(green_fft, poisson_params, cell%hmat, auxbas_pw_pool, pwdummy, pwdummy)
-               rho_tot_gspace%cc(:) = rho_tot_gspace%cc(:)*green_fft%influence_fn%cc(:)
+               rho_tot_gspace%cc(:) = rho_tot_gspace%cc(:)*green_fft%influence_fn%array(:)
                CALL pw_green_release(green_fft, auxbas_pw_pool)
             END BLOCK
             IF (my_v_hartree) THEN

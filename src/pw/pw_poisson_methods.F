@@ -414,9 +414,7 @@ CONTAINS
                IF (PRESENT(greenfn)) THEN
                   influence_fn = greenfn
                ELSE
-                  influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
-                  influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
-                  influence_fn%array => poisson_env%green_fft%influence_fn%cc
+                  influence_fn = poisson_env%green_fft%influence_fn
                END IF
                CALL pw_multiply_with(rhog, influence_fn)
                IF (PRESENT(aux_density)) THEN
@@ -595,9 +593,7 @@ CONTAINS
                   IF (PRESENT(greenfn)) THEN
                      influence_fn = greenfn
                   ELSE
-                     influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
-                     influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
-                     influence_fn%array => poisson_env%green_fft%influence_fn%cc
+                     influence_fn = poisson_env%green_fft%influence_fn
                   END IF
                   CALL pw_multiply_with(rhog, influence_fn)
                   IF (PRESENT(aux_density)) THEN
@@ -799,9 +795,7 @@ CONTAINS
                   IF (PRESENT(greenfn)) THEN
                      influence_fn = greenfn
                   ELSE
-                     influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
-                     influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
-                     influence_fn%array => poisson_env%green_fft%influence_fn%cc
+                     influence_fn = poisson_env%green_fft%influence_fn
                   END IF
                   CALL pw_multiply_with(rhog, influence_fn)
                   IF (PRESENT(aux_density)) THEN
@@ -980,9 +974,7 @@ CONTAINS
                      IF (PRESENT(greenfn)) THEN
                         influence_fn = greenfn
                      ELSE
-                        influence_fn%in_space = poisson_env%green_fft%influence_fn%in_space
-                        influence_fn%pw_grid => poisson_env%green_fft%influence_fn%pw_grid
-                        influence_fn%array => poisson_env%green_fft%influence_fn%cc
+                        influence_fn = poisson_env%green_fft%influence_fn
                      END IF
                      CALL pw_multiply_with(rhog, influence_fn)
                      IF (PRESENT(aux_density)) THEN
@@ -1140,8 +1132,8 @@ CONTAINS
       TYPE(pw_type), DIMENSION(3), OPTIONAL              :: dvhartree
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(OUT), &
          OPTIONAL                                        :: h_stress
-      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL :: rho_core
-      TYPE(pw_type), INTENT(IN), OPTIONAL                :: greenfn, aux_density
+      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL :: rho_core, greenfn
+      TYPE(pw_type), INTENT(IN), OPTIONAL                :: aux_density
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_poisson_solve'
 
@@ -1149,7 +1141,8 @@ CONTAINS
       LOGICAL                                            :: has_dielectric
       TYPE(pw_grid_type), POINTER                        :: pw_grid
       TYPE(pw_pool_type), POINTER                        :: pw_pool
-      TYPE(pw_type)                                      :: influence_fn, rhog, &
+      TYPE(pw_c1d_type) :: influence_fn
+      TYPE(pw_type)                                      ::  rhog, &
                                                             rhog_aux, rhor, tmpg, vhartree_rs
 
       CALL timeset(routineN, handle)
@@ -1191,9 +1184,9 @@ CONTAINS
             ELSE
                influence_fn = poisson_env%green_fft%influence_fn
             END IF
-            rhog%cc(:) = rhog%cc(:)*influence_fn%cc(:)
+            rhog%cc(:) = rhog%cc(:)*influence_fn%array(:)
             IF (PRESENT(aux_density)) THEN
-               rhog_aux%cc(:) = rhog_aux%cc(:)*influence_fn%cc(:)
+               rhog_aux%cc(:) = rhog_aux%cc(:)*influence_fn%array(:)
             END IF
             IF (PRESENT(vhartree)) THEN
                CALL pw_transfer(rhog, vhartree)
