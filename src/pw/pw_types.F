@@ -48,7 +48,7 @@ MODULE pw_types
 
    ! Flags for the structure member 'in_space'
    ! NOSPACE only for internal usage, we enforce the choice of a proper space
-   INTEGER, PARAMETER :: NOSPACE = 371
+   INTEGER, PARAMETER, PUBLIC :: NOSPACE = 371
    INTEGER, PARAMETER, PUBLIC :: REALSPACE = 372, RECIPROCALSPACE = 373
 
 ! **************************************************************************************************
