@@ -38,6 +38,7 @@ MODULE realspace_grid_types
                                               pw_grid_retain
    USE pw_methods,                      ONLY: pw_integrate_function
    USE pw_types,                        ONLY: REALDATA3D,&
+                                              pw_r3d_type,&
                                               pw_type
    USE util,                            ONLY: get_limit
 
@@ -76,6 +77,14 @@ MODULE realspace_grid_types
 
    LOGICAL, PRIVATE, PARAMETER :: debug_this_module = .FALSE.
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'realspace_grid_types'
+
+   INTERFACE transfer_rs2pw
+      MODULE PROCEDURE transfer_rs2pw_r3d, transfer_rs2pw_pw
+   END INTERFACE
+
+   INTERFACE transfer_pw2rs
+      MODULE PROCEDURE transfer_pw2rs_r3d, transfer_pw2rs_pw
+   END INTERFACE
 
 ! **************************************************************************************************
    TYPE realspace_grid_input_type
@@ -653,12 +662,33 @@ CONTAINS
 !> \param rs ...
 !> \param pw ...
 ! **************************************************************************************************
-   SUBROUTINE transfer_rs2pw(rs, pw)
+   SUBROUTINE transfer_rs2pw_pw(rs, pw)
 
       TYPE(realspace_grid_type), INTENT(IN)              :: rs
       TYPE(pw_type), INTENT(INOUT)                       :: pw
 
-      CHARACTER(len=*), PARAMETER                        :: routineN = 'transfer_rs2pw'
+      TYPE(pw_r3d_type)                                  :: my_pw
+
+      IF (pw%in_use .NE. REALDATA3D) &
+         CPABORT("Need REALDATA3D")
+
+      my_pw%pw_grid => pw%pw_grid
+      my_pw%array => pw%cr3d
+      my_pw%in_space = pw%in_space
+      CALL transfer_rs2pw_r3d(rs, my_pw)
+
+   END SUBROUTINE transfer_rs2pw_pw
+
+! **************************************************************************************************
+!> \brief ...
+!> \param rs ...
+!> \param pw ...
+! **************************************************************************************************
+   SUBROUTINE transfer_rs2pw_r3d(rs, pw)
+      TYPE(realspace_grid_type), INTENT(IN)              :: rs
+      TYPE(pw_r3d_type), INTENT(INOUT)                   :: pw
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'transfer_rs2pw_r3d'
 
       INTEGER                                            :: handle, handle2, i
 
@@ -667,8 +697,6 @@ CONTAINS
 
       IF (.NOT. ASSOCIATED(rs%desc%pw, pw%pw_grid)) &
          CPABORT("Different rs and pw indentifiers")
-      IF (pw%in_use .NE. REALDATA3D) &
-         CPABORT("Need REALDATA3D")
 
       IF (rs%desc%distributed) THEN
          CALL transfer_rs2pw_distributed(rs, pw)
@@ -676,13 +704,13 @@ CONTAINS
          CALL transfer_rs2pw_replicated(rs, pw)
       ELSE ! treat simple serial case locally
          IF (rs%desc%border == 0) THEN
-            CALL dcopy(SIZE(rs%r), rs%r, 1, pw%cr3d, 1)
+            CALL dcopy(SIZE(rs%r), rs%r, 1, pw%array, 1)
          ELSE
-            CPASSERT(LBOUND(pw%cr3d, 3) .EQ. rs%lb_real(3))
+            CPASSERT(LBOUND(pw%array, 3) .EQ. rs%lb_real(3))
 !$OMP          PARALLEL DO DEFAULT(NONE) SHARED(pw,rs)
             DO i = rs%lb_real(3), rs%ub_real(3)
-               pw%cr3d(:, :, i) = rs%r(rs%lb_real(1):rs%ub_real(1), &
-                                       rs%lb_real(2):rs%ub_real(2), i)
+               pw%array(:, :, i) = rs%r(rs%lb_real(1):rs%ub_real(1), &
+                                        rs%lb_real(2):rs%ub_real(2), i)
             END DO
 !$OMP          END PARALLEL DO
          END IF
@@ -691,19 +719,41 @@ CONTAINS
       CALL timestop(handle)
       CALL timestop(handle2)
 
-   END SUBROUTINE transfer_rs2pw
+   END SUBROUTINE transfer_rs2pw_r3d
 
 ! **************************************************************************************************
 !> \brief Copy a function from/to a PW grid type to/from a real space type
 !> \param rs ...
 !> \param pw ...
 ! **************************************************************************************************
-   SUBROUTINE transfer_pw2rs(rs, pw)
+   SUBROUTINE transfer_pw2rs_pw(rs, pw)
 
       TYPE(realspace_grid_type), INTENT(IN)              :: rs
       TYPE(pw_type), INTENT(IN)                          :: pw
 
-      CHARACTER(len=*), PARAMETER                        :: routineN = 'transfer_pw2rs'
+      TYPE(pw_r3d_type)                                  :: my_pw
+
+      IF (pw%in_use .NE. REALDATA3D) &
+         CPABORT("Need REALDATA3D")
+
+      my_pw%pw_grid => pw%pw_grid
+      my_pw%array => pw%cr3d
+      my_pw%in_space = pw%in_space
+      CALL transfer_pw2rs_r3d(rs, my_pw)
+
+   END SUBROUTINE transfer_pw2rs_pw
+
+! **************************************************************************************************
+!> \brief ...
+!> \param rs ...
+!> \param pw ...
+! **************************************************************************************************
+   SUBROUTINE transfer_pw2rs_r3d(rs, pw)
+
+      TYPE(realspace_grid_type), INTENT(IN)              :: rs
+      TYPE(pw_r3d_type), INTENT(IN)                      :: pw
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'transfer_pw2rs_r3d'
 
       INTEGER                                            :: handle, handle2, i, im, j, jm, k, km
 
@@ -712,8 +762,6 @@ CONTAINS
 
       IF (.NOT. ASSOCIATED(rs%desc%pw, pw%pw_grid)) &
          CPABORT("Different rs and pw indentifiers")
-      IF (pw%in_use .NE. REALDATA3D) &
-         CPABORT("Need REALDATA3D")
 
       IF (rs%desc%distributed) THEN
          CALL transfer_pw2rs_distributed(rs, pw)
@@ -721,7 +769,7 @@ CONTAINS
          CALL transfer_pw2rs_replicated(rs, pw)
       ELSE ! treat simple serial case locally
          IF (rs%desc%border == 0) THEN
-            CALL dcopy(SIZE(rs%r), pw%cr3d, 1, rs%r, 1)
+            CALL dcopy(SIZE(rs%r), pw%array, 1, rs%r, 1)
          ELSE
 !$OMP          PARALLEL DO DEFAULT(NONE) &
 !$OMP                      PRIVATE(i,im,j,jm,k,km) &
@@ -750,7 +798,7 @@ CONTAINS
                      ELSE
                         im = i
                      END IF
-                     rs%r(i, j, k) = pw%cr3d(im, jm, km)
+                     rs%r(i, j, k) = pw%array(im, jm, km)
                   END DO
                END DO
             END DO
@@ -761,7 +809,7 @@ CONTAINS
       CALL timestop(handle)
       CALL timestop(handle2)
 
-   END SUBROUTINE transfer_pw2rs
+   END SUBROUTINE transfer_pw2rs_r3d
 
 ! **************************************************************************************************
 !> \brief transfer from a realspace grid to a planewave grid
@@ -770,7 +818,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE transfer_rs2pw_replicated(rs, pw)
       TYPE(realspace_grid_type), INTENT(IN)              :: rs
-      TYPE(pw_type), INTENT(INOUT)                       :: pw
+      TYPE(pw_r3d_type), INTENT(INOUT)                   :: pw
 
       INTEGER                                            :: dest, ii, ip, ix, iy, iz, nma, nn, s(3), &
                                                             source
@@ -824,7 +872,7 @@ CONTAINS
          nn = rcount(mepos)
       END ASSOCIATE
 
-      CALL dcopy(nn, sendbuf, 1, pw%cr3d, 1)
+      CALL dcopy(nn, sendbuf, 1, pw%array, 1)
 
       DEALLOCATE (rcount)
       DEALLOCATE (sendbuf)
@@ -839,7 +887,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE transfer_pw2rs_replicated(rs, pw)
       TYPE(realspace_grid_type), INTENT(IN)              :: rs
-      TYPE(pw_type), INTENT(IN)                          :: pw
+      TYPE(pw_r3d_type), INTENT(IN)                      :: pw
 
       INTEGER                                            :: dest, i, ii, im, ip, ix, iy, iz, j, jm, &
                                                             k, km, nma, nn, source
@@ -863,7 +911,7 @@ CONTAINS
          CALL m_memory()
 
          nn = rcount(mepos)
-         CALL dcopy(nn, pw%cr3d, 1, sendbuf, 1)
+         CALL dcopy(nn, pw%array, 1, sendbuf, 1)
 
          dest = MODULO(mepos + 1, np)
          source = MODULO(mepos - 1, np)
@@ -960,7 +1008,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE transfer_rs2pw_distributed(rs, pw)
       TYPE(realspace_grid_type), INTENT(IN)              :: rs
-      TYPE(pw_type), INTENT(IN)                          :: pw
+      TYPE(pw_r3d_type), INTENT(IN)                      :: pw
 
       CHARACTER(LEN=200)                                 :: error_string
       INTEGER :: completed, dest_down, dest_up, i, idir, j, k, lb, my_id, my_pw_rank, my_rs_rank, &
@@ -1380,7 +1428,7 @@ CONTAINS
             DO y = recv_tasks(completed - 1, 3), recv_tasks(completed - 1, 4)
                DO x = recv_tasks(completed - 1, 1), recv_tasks(completed - 1, 2)
                   k = k + 1
-                  pw%cr3d(x, y, z) = recv_bufs(completed - 1)%array(k)
+                  pw%array(x, y, z) = recv_bufs(completed - 1)%array(k)
                END DO
             END DO
          END DO
@@ -1447,7 +1495,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE transfer_pw2rs_distributed(rs, pw)
       TYPE(realspace_grid_type), INTENT(IN)              :: rs
-      TYPE(pw_type), INTENT(IN)                          :: pw
+      TYPE(pw_r3d_type), INTENT(IN)                      :: pw
 
       INTEGER :: completed, dest_down, dest_up, i, idir, j, k, lb, my_id, my_pw_rank, my_rs_rank, &
          n_shifts, nn, num_threads, position, source_down, source_up, ub, x, y, z
@@ -1624,7 +1672,7 @@ CONTAINS
             DO y = send_tasks(i, 3), send_tasks(i, 4)
                DO x = send_tasks(i, 1), send_tasks(i, 2)
                   k = k + 1
-                  send_bufs(i)%array(k) = pw%cr3d(x, y, z)
+                  send_bufs(i)%array(k) = pw%array(x, y, z)
                END DO
             END DO
          END DO
