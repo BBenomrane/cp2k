@@ -149,9 +149,9 @@ MODULE qs_collocate_density
       MODULE PROCEDURE calculate_wavefunction_pw, calculate_wavefunction_new
    END INTERFACE
 
-!   INTERFACE collocate_single_gaussian
-!      MODULE PROCEDURE collocate_single_gaussian_pw, collocate_single_gaussian_new
-!   END INTERFACE
+   INTERFACE collocate_single_gaussian
+      MODULE PROCEDURE collocate_single_gaussian_pw, collocate_single_gaussian_new
+   END INTERFACE
 
 CONTAINS
 
@@ -2457,6 +2457,36 @@ CONTAINS
 
    END SUBROUTINE calculate_drho_elec_dR
 
+   SUBROUTINE collocate_single_gaussian_pw(rho, rho_gspace, &
+                                           atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
+                                           pw_env, required_function, basis_type)
+
+      TYPE(pw_type), INTENT(INOUT)                       :: rho, rho_gspace
+      TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
+      TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
+      TYPE(cell_type), POINTER                           :: cell
+      TYPE(dft_control_type), POINTER                    :: dft_control
+      TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
+      TYPE(pw_env_type), POINTER                         :: pw_env
+      INTEGER, INTENT(IN)                                :: required_function
+      CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: basis_type
+
+      TYPE(pw_r3d_type) :: my_rho
+      TYPE(pw_c1d_type) :: my_rho_gspace
+
+      my_rho%in_space = rho%in_space
+      my_rho%pw_grid => rho%pw_grid
+      my_rho%array => rho%cr3d
+      my_rho_gspace%in_space = rho_gspace%in_space
+      my_rho_gspace%pw_grid => rho_gspace%pw_grid
+      my_rho_gspace%array => rho_gspace%cc
+
+      CALL collocate_single_gaussian_new(my_rho, my_rho_gspace, &
+                                         atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
+                                         pw_env, required_function, basis_type)
+
+   END SUBROUTINE collocate_single_gaussian_pw
+
 ! **************************************************************************************************
 !> \brief maps a single gaussian on the grid
 !> \param rho ...
@@ -2475,11 +2505,12 @@ CONTAINS
 !>      modified calculate_wave function assuming that the collocation of only a single Gaussian is required.
 !>      chooses a basis function (in contrast to calculate_rho_core or calculate_rho_single_gaussian)
 ! **************************************************************************************************
-   SUBROUTINE collocate_single_gaussian(rho, rho_gspace, &
-                                        atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
-                                        pw_env, required_function, basis_type)
+   SUBROUTINE collocate_single_gaussian_new(rho, rho_gspace, &
+                                            atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
+                                            pw_env, required_function, basis_type)
 
-      TYPE(pw_type), INTENT(INOUT)                       :: rho, rho_gspace
+      TYPE(pw_r3d_type), INTENT(INOUT)                       :: rho
+      TYPE(pw_c1d_type), INTENT(INOUT) :: rho_gspace
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
       TYPE(cell_type), POINTER                           :: cell
@@ -2640,7 +2671,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE collocate_single_gaussian
+   END SUBROUTINE collocate_single_gaussian_new
 
    SUBROUTINE calculate_wavefunction_pw(mo_vectors, ivector, rho, rho_gspace, &
                                         atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
