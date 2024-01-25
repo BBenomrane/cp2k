@@ -1543,13 +1543,11 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_poisson_solve'
 
-      INTEGER                                            :: alpha, beta, handle, i
-      INTEGER, DIMENSION(3)                              :: n
+      INTEGER                                            :: handle
       LOGICAL                                            :: has_dielectric
-      REAL(KIND=dp)                                      :: ffa
       TYPE(pw_grid_type), POINTER                        :: pw_grid
       TYPE(pw_pool_type), POINTER                        :: pw_pool
-      TYPE(pw_type)                                      :: dvg(3), dvg_aux(3), influence_fn, rhog, &
+      TYPE(pw_type)                                      :: influence_fn, rhog, &
                                                             rhog_aux, rhor, tmpg, vhartree_rs
 
       CALL timeset(routineN, handle)
@@ -1689,18 +1687,106 @@ CONTAINS
 
       END SELECT
 
-      ! do we need to calculate the derivative of the potential?
-      IF (PRESENT(h_stress) .OR. PRESENT(dvhartree)) THEN
+      IF (PRESENT(dvhartree)) THEN
+         BLOCK
+            TYPE(pw_c1d_type) :: my_rhog, my_rhog_aux
+            my_rhog%in_space = rhog%in_space
+            my_rhog%array => rhog%cc
+            my_rhog%pw_grid => rhog%pw_grid
+            IF (PRESENT(aux_density)) THEN
+               my_rhog_aux%in_space = rhog_aux%in_space
+               my_rhog_aux%array => rhog_aux%cc
+               my_rhog_aux%pw_grid => rhog_aux%pw_grid
+            END IF
+            IF (dvhartree(1)%in_use == REALDATA3D) THEN
+               BLOCK
+                  TYPE(pw_r3d_type) :: my_dvhartree(3)
+                  INTEGER :: i
+                  DO i = 1, 3
+                     my_dvhartree(i)%in_space = dvhartree(i)%in_space
+                     my_dvhartree(i)%pw_grid => dvhartree(i)%pw_grid
+                     my_dvhartree(i)%array => dvhartree(i)%cr3d
+                  END DO
+                  IF (PRESENT(aux_density)) THEN
+           CALL calc_stress_and_gradient_r3d(poisson_env, my_rhog, ehartree, my_rhog_aux, h_stress=h_stress, dvhartree=my_dvhartree)
+                  ELSE
+                     CALL calc_stress_and_gradient_r3d(poisson_env, my_rhog, ehartree, h_stress=h_stress, dvhartree=my_dvhartree)
+                  END IF
+               END BLOCK
+            ELSE IF (dvhartree(1)%in_use == COMPLEXDATA1D) THEN
+               BLOCK
+                  TYPE(pw_c1d_type) :: my_dvhartree(3)
+                  INTEGER :: i
+                  DO i = 1, 3
+                     my_dvhartree(i)%in_space = dvhartree(i)%in_space
+                     my_dvhartree(i)%pw_grid => dvhartree(i)%pw_grid
+                     my_dvhartree(i)%array => dvhartree(i)%cc
+                  END DO
+                  IF (PRESENT(aux_density)) THEN
+           CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, my_rhog_aux, h_stress=h_stress, dvhartree=my_dvhartree)
+                  ELSE
+                     CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, h_stress=h_stress, dvhartree=my_dvhartree)
+                  END IF
+               END BLOCK
+            ELSE
+               CPABORT("Grid type not supported!")
+            END IF
+         END BLOCK
+      ELSE IF (PRESENT(h_stress)) THEN
+         BLOCK
+            TYPE(pw_c1d_type) :: my_rhog, my_rhog_aux
+            my_rhog%in_space = rhog%in_space
+            my_rhog%array => rhog%cc
+            my_rhog%pw_grid => rhog%pw_grid
+            IF (PRESENT(aux_density)) THEN
+               my_rhog_aux%in_space = rhog_aux%in_space
+               my_rhog_aux%array => rhog_aux%cc
+               my_rhog_aux%pw_grid => rhog_aux%pw_grid
+
+               CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, my_rhog_aux, h_stress=h_stress)
+            ELSE
+               CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, h_stress=h_stress)
+            END IF
+         END BLOCK
+      END IF
+
+      CALL pw_pool%give_back_pw(rhog)
+      IF (PRESENT(aux_density)) THEN
+         CALL pw_pool%give_back_pw(rhog_aux)
+      END IF
+
+      CALL timestop(handle)
+
+   END SUBROUTINE pw_poisson_solve_pw
+
+   #:for kind in ["c1d", "r3d"]
+      SUBROUTINE calc_stress_and_gradient_${kind}$ (poisson_env, rhog, ehartree, rhog_aux, h_stress, dvhartree)
+         TYPE(pw_poisson_type), INTENT(IN) :: poisson_env
+         TYPE(pw_c1d_type), INTENT(IN) :: rhog
+         REAL(KIND=dp) :: ehartree
+         TYPE(pw_c1d_type), INTENT(IN), OPTIONAL :: rhog_aux
+         REAL(KIND=dp), DIMENSION(3, 3), INTENT(OUT), OPTIONAL :: h_stress
+         TYPE(pw_${kind}$_type), DIMENSION(3), INTENT(INOUT), OPTIONAL :: dvhartree
+
+         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_poisson_set'
+
+         REAL(KIND=dp) :: ffa
+         INTEGER :: alpha, beta, n(3), handle, i
+         TYPE(pw_c1d_type) :: dvg(3), dvg_aux(3)
+         TYPE(pw_pool_type), POINTER                        :: pw_pool
+
+         CALL timeset(routineN, handle)
+
+         pw_pool => poisson_env%pw_pools(poisson_env%pw_level)%pool
+
          DO i = 1, 3
-            CALL pw_pool%create_pw(dvg(i), use_data=COMPLEXDATA1D, &
-                                   in_space=RECIPROCALSPACE)
+            CALL pw_pool%create_pw(dvg(i), in_space=RECIPROCALSPACE)
             n = 0
             n(i) = 1
             CALL pw_copy(rhog, dvg(i))
             CALL pw_derive(dvg(i), n)
-            IF (PRESENT(aux_density)) THEN
-               CALL pw_pool%create_pw(dvg_aux(i), use_data=COMPLEXDATA1D, &
-                                      in_space=RECIPROCALSPACE)
+            IF (PRESENT(rhog_aux)) THEN
+               CALL pw_pool%create_pw(dvg_aux(i), in_space=RECIPROCALSPACE)
                CALL pw_copy(rhog_aux, dvg_aux(i))
                CALL pw_derive(dvg_aux(i), n)
             END IF
@@ -1718,7 +1804,7 @@ CONTAINS
             h_stress = 0.0_dp
             DO alpha = 1, 3
                h_stress(alpha, alpha) = ehartree
-               IF (PRESENT(aux_density)) THEN
+               IF (PRESENT(rhog_aux)) THEN
                   DO beta = alpha, 3
                      h_stress(alpha, beta) = h_stress(alpha, beta) &
                                              + ffa*pw_integral_ab(dvg_aux(alpha), dvg(beta))
@@ -1793,20 +1879,15 @@ CONTAINS
 
          DO i = 1, 3
             CALL pw_pool%give_back_pw(dvg(i))
-            IF (PRESENT(aux_density)) THEN
+            IF (PRESENT(rhog_aux)) THEN
                CALL pw_pool%give_back_pw(dvg_aux(i))
             END IF
          END DO
 
-      END IF
-      CALL pw_pool%give_back_pw(rhog)
-      IF (PRESENT(aux_density)) THEN
-         CALL pw_pool%give_back_pw(rhog_aux)
-      END IF
+         CALL timestop(handle)
 
-      CALL timestop(handle)
-
-   END SUBROUTINE pw_poisson_solve_pw
+      END SUBROUTINE calc_stress_and_gradient_${kind}$
+   #:endfor
 
 ! **************************************************************************************************
 !> \brief sets cell, grids and parameters used by the poisson solver
