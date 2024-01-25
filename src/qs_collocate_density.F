@@ -86,7 +86,7 @@ MODULE qs_collocate_density
                             pw_pools_give_back_pws
    USE pw_types, ONLY: COMPLEXDATA1D, &
                        REALDATA3D, &
-                       REALSPACE, &
+                       pw_r3d_type, REALSPACE, &
                        RECIPROCALSPACE, &
                        pw_c1d_type, pw_type
    USE qs_environment_types, ONLY: get_qs_env, &
@@ -140,6 +140,18 @@ MODULE qs_collocate_density
       MODULE PROCEDURE calculate_rho_core_pw_type
       MODULE PROCEDURE calculate_rho_core_pw_c1d_type
    END INTERFACE
+
+   INTERFACE calculate_rho_elec
+      MODULE PROCEDURE calculate_rho_elec_pw, calculate_rho_elec_new
+   END INTERFACE
+
+!INTERFACE calculate_wavefunction
+!MODULE PROCEDURE calculate_wavefunction_pw, calculate_wavefunction_new
+!END INTERFACE
+
+!   INTERFACE collocate_single_gaussian
+!      MODULE PROCEDURE collocate_single_gaussian_pw, collocate_single_gaussian_new
+!   END INTERFACE
 
 CONTAINS
 
@@ -1448,6 +1460,38 @@ CONTAINS
 
    END SUBROUTINE calculate_rho_resp_all
 
+   SUBROUTINE calculate_rho_elec_pw(matrix_p, matrix_p_kp, rho, rho_gspace, total_rho, &
+                                    ks_env, soft_valid, compute_tau, compute_grad, &
+                                    basis_type, der_type, idir, task_list_external, pw_env_external)
+
+      TYPE(dbcsr_type), OPTIONAL, TARGET                 :: matrix_p
+      TYPE(dbcsr_p_type), DIMENSION(:), OPTIONAL, &
+         POINTER                                         :: matrix_p_kp
+      TYPE(pw_type), INTENT(INOUT)                       :: rho, rho_gspace
+      REAL(KIND=dp), INTENT(OUT), OPTIONAL               :: total_rho
+      TYPE(qs_ks_env_type), POINTER                      :: ks_env
+      LOGICAL, INTENT(IN), OPTIONAL                      :: soft_valid, compute_tau, compute_grad
+      CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: basis_type
+      INTEGER, INTENT(IN), OPTIONAL                      :: der_type, idir
+      TYPE(task_list_type), OPTIONAL, POINTER            :: task_list_external
+      TYPE(pw_env_type), OPTIONAL, POINTER               :: pw_env_external
+
+      TYPE(pw_r3d_type) :: my_rho
+      TYPE(pw_c1d_type) :: my_rho_gspace
+
+      my_rho%in_space = rho%in_space
+      my_rho%pw_grid => rho%pw_grid
+      my_rho%array => rho%cr3d
+      my_rho_gspace%in_space = rho_gspace%in_space
+      my_rho_gspace%pw_grid => rho_gspace%pw_grid
+      my_rho_gspace%array => rho_gspace%cc
+
+      CALL calculate_rho_elec_new(matrix_p, matrix_p_kp, my_rho, my_rho_gspace, total_rho, &
+                                  ks_env, soft_valid, compute_tau, compute_grad, &
+                                  basis_type, der_type, idir, task_list_external, pw_env_external)
+
+   END SUBROUTINE calculate_rho_elec_pw
+
 ! **************************************************************************************************
 !> \brief computes the density corresponding to a given density matrix on the grid
 !> \param matrix_p ...
@@ -1473,14 +1517,15 @@ CONTAINS
 !>      both rho and rho_gspace contain the new rho
 !>      (in real and g-space respectively)
 ! **************************************************************************************************
-   SUBROUTINE calculate_rho_elec(matrix_p, matrix_p_kp, rho, rho_gspace, total_rho, &
-                                 ks_env, soft_valid, compute_tau, compute_grad, &
-                                 basis_type, der_type, idir, task_list_external, pw_env_external)
+   SUBROUTINE calculate_rho_elec_new(matrix_p, matrix_p_kp, rho, rho_gspace, total_rho, &
+                                     ks_env, soft_valid, compute_tau, compute_grad, &
+                                     basis_type, der_type, idir, task_list_external, pw_env_external)
 
       TYPE(dbcsr_type), OPTIONAL, TARGET                 :: matrix_p
       TYPE(dbcsr_p_type), DIMENSION(:), OPTIONAL, &
          POINTER                                         :: matrix_p_kp
-      TYPE(pw_type), INTENT(INOUT)                       :: rho, rho_gspace
+      TYPE(pw_r3d_type), INTENT(INOUT)                       :: rho
+      TYPE(pw_c1d_type), INTENT(INOUT) :: rho_gspace
       REAL(KIND=dp), INTENT(OUT), OPTIONAL               :: total_rho
       TYPE(qs_ks_env_type), POINTER                      :: ks_env
       LOGICAL, INTENT(IN), OPTIONAL                      :: soft_valid, compute_tau, compute_grad
@@ -1625,7 +1670,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE calculate_rho_elec
+   END SUBROUTINE calculate_rho_elec_new
 
 ! **************************************************************************************************
 !> \brief computes the gradient of the density corresponding to a given
