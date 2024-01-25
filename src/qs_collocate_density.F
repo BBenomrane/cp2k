@@ -145,9 +145,9 @@ MODULE qs_collocate_density
       MODULE PROCEDURE calculate_rho_elec_pw, calculate_rho_elec_new
    END INTERFACE
 
-!INTERFACE calculate_wavefunction
-!MODULE PROCEDURE calculate_wavefunction_pw, calculate_wavefunction_new
-!END INTERFACE
+   INTERFACE calculate_wavefunction
+      MODULE PROCEDURE calculate_wavefunction_pw, calculate_wavefunction_new
+   END INTERFACE
 
 !   INTERFACE collocate_single_gaussian
 !      MODULE PROCEDURE collocate_single_gaussian_pw, collocate_single_gaussian_new
@@ -2642,6 +2642,38 @@ CONTAINS
 
    END SUBROUTINE collocate_single_gaussian
 
+   SUBROUTINE calculate_wavefunction_pw(mo_vectors, ivector, rho, rho_gspace, &
+                                        atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
+                                        pw_env, basis_type, external_vector)
+
+      TYPE(cp_fm_type), INTENT(IN)                       :: mo_vectors
+      INTEGER, INTENT(IN)                                :: ivector
+      TYPE(pw_type), INTENT(INOUT)                       :: rho, rho_gspace
+      TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
+      TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
+      TYPE(cell_type), POINTER                           :: cell
+      TYPE(dft_control_type), POINTER                    :: dft_control
+      TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
+      TYPE(pw_env_type), POINTER                         :: pw_env
+      CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: basis_type
+      REAL(KIND=dp), DIMENSION(:), OPTIONAL              :: external_vector
+
+      TYPE(pw_r3d_type) :: my_rho
+      TYPE(pw_c1d_type) :: my_rho_gspace
+
+      my_rho%in_space = rho%in_space
+      my_rho%pw_grid => rho%pw_grid
+      my_rho%array => rho%cr3d
+      my_rho_gspace%in_space = rho_gspace%in_space
+      my_rho_gspace%pw_grid => rho_gspace%pw_grid
+      my_rho_gspace%array => rho_gspace%cc
+
+      CALL calculate_wavefunction_new(mo_vectors, ivector, my_rho, my_rho_gspace, &
+                                      atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
+                                      pw_env, basis_type, external_vector)
+
+   END SUBROUTINE calculate_wavefunction_pw
+
 ! **************************************************************************************************
 !> \brief maps a given wavefunction on the grid
 !> \param mo_vectors ...
@@ -2667,13 +2699,14 @@ CONTAINS
 !>      does it take correctly the periodic images of the basis functions into account
 !>      i.e. is only correct if the basis functions are localised enough to be just in 1 cell ?
 ! **************************************************************************************************
-   SUBROUTINE calculate_wavefunction(mo_vectors, ivector, rho, rho_gspace, &
-                                     atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
-                                     pw_env, basis_type, external_vector)
+   SUBROUTINE calculate_wavefunction_new(mo_vectors, ivector, rho, rho_gspace, &
+                                         atomic_kind_set, qs_kind_set, cell, dft_control, particle_set, &
+                                         pw_env, basis_type, external_vector)
 
       TYPE(cp_fm_type), INTENT(IN)                       :: mo_vectors
       INTEGER, INTENT(IN)                                :: ivector
-      TYPE(pw_type), INTENT(INOUT)                       :: rho, rho_gspace
+      TYPE(pw_r3d_type), INTENT(INOUT)                       :: rho
+      TYPE(pw_c1d_type), INTENT(INOUT) :: rho_gspace
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
       TYPE(cell_type), POINTER                           :: cell
@@ -2845,6 +2878,6 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE calculate_wavefunction
+   END SUBROUTINE calculate_wavefunction_new
 
 END MODULE qs_collocate_density
