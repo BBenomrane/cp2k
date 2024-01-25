@@ -3889,7 +3889,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_gauss_damp(pw, omega)
 
-                           TYPE(pw_type), INTENT(INOUT)                       :: pw
+                           TYPE(pw_c1d_type), INTENT(INOUT)                       :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: omega
 
                            CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_gauss_damp'
@@ -3903,11 +3903,10 @@ CONTAINS
                            omega_2 = omega*omega
                            omega_2 = 0.25_dp/omega_2
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw,omega_2)
-                              pw%cc(:) = pw%cc(:)*EXP(-pw%pw_grid%gsq(:)*omega_2)
+                              pw%array = pw%array*EXP(-pw%pw_grid%gsq*omega_2)
 !$OMP END PARALLEL WORKSHARE
                            ELSE
                               CPABORT("No suitable data field")
@@ -3927,7 +3926,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_log_deriv_gauss(pw, omega)
 
-                           TYPE(pw_type), INTENT(IN)                          :: pw
+                           TYPE(pw_c1d_type), INTENT(IN)                          :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: omega
 
                            CHARACTER(len=*), PARAMETER :: routineN = 'pw_log_deriv_gauss'
@@ -3941,11 +3940,10 @@ CONTAINS
                            omega_2 = omega*omega
                            omega_2 = 0.25_dp/omega_2
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw,omega_2)
-                              pw%cc(:) = pw%cc(:)*(1.0_dp + omega_2*pw%pw_grid%gsq(:))
+                              pw%array = pw%array*(1.0_dp + omega_2*pw%pw_grid%gsq)
 !$OMP END PARALLEL WORKSHARE
 
                            ELSE
@@ -3973,7 +3971,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_compl_gauss_damp(pw, omega)
 
-                           TYPE(pw_type), INTENT(INOUT)                       :: pw
+                           TYPE(pw_c1d_type), INTENT(INOUT)                       :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: omega
 
                            CHARACTER(len=*), PARAMETER :: routineN = 'pw_compl_gauss_damp'
@@ -3986,18 +3984,17 @@ CONTAINS
                            omega_2 = omega*omega
                            omega_2 = 0.25_dp/omega_2
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
-                              cnt = SIZE(pw%cc)
+                              cnt = SIZE(pw%array)
 
 !$OMP PARALLEL DO PRIVATE(i, tmp) DEFAULT(NONE) SHARED(cnt, pw,omega_2)
                               DO i = 1, cnt
                                  tmp = -omega_2*pw%pw_grid%gsq(i)
                                  IF (ABS(tmp) > 1.0E-5_dp) THEN
-                                    pw%cc(i) = pw%cc(i)*(1.0_dp - EXP(tmp))
+                                    pw%array(i) = pw%array(i)*(1.0_dp - EXP(tmp))
                                  ELSE
-                                    pw%cc(i) = pw%cc(i)*(tmp + 0.5_dp*tmp*(tmp + (1.0_dp/3.0_dp)*tmp**2))
+                                    pw%array(i) = pw%array(i)*(tmp + 0.5_dp*tmp*(tmp + (1.0_dp/3.0_dp)*tmp**2))
                                  END IF
                               END DO
 !$OMP END PARALLEL DO
@@ -4021,7 +4018,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_log_deriv_compl_gauss(pw, omega)
 
-                           TYPE(pw_type), INTENT(IN)                          :: pw
+                           TYPE(pw_c1d_type), INTENT(IN)                          :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: omega
 
                            CHARACTER(len=*), PARAMETER :: routineN = 'pw_log_deriv_compl_gauss'
@@ -4034,18 +4031,17 @@ CONTAINS
                            omega_2 = omega*omega
                            omega_2 = 0.25_dp/omega_2
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i,tmp) &
 !$OMP             SHARED(pw,omega_2)
-                              DO i = 1, SIZE(pw%cc)
+                              DO i = 1, SIZE(pw%array)
                                  tmp = omega_2*pw%pw_grid%gsq(i)
                                  ! For too small arguments, use the Taylor polynomial to prevent division by zero
                                  IF (ABS(tmp) >= 0.003_dp) THEN
-                                    pw%cc(i) = pw%cc(i)*(1.0_dp - tmp*EXP(-tmp)/(1.0_dp - EXP(-tmp)))
+                                    pw%array(i) = pw%array(i)*(1.0_dp - tmp*EXP(-tmp)/(1.0_dp - EXP(-tmp)))
                                  ELSE
-                                    pw%cc(i) = pw%cc(i)*(0.5_dp*tmp - tmp**2/12.0_dp)
+                                    pw%array(i) = pw%array(i)*(0.5_dp*tmp - tmp**2/12.0_dp)
                                  END IF
                               END DO
 !$OMP END PARALLEL DO
@@ -4078,7 +4074,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_gauss_damp_mix(pw, omega, scale_coul, scale_long)
 
-                           TYPE(pw_type), INTENT(INOUT)                       :: pw
+                           TYPE(pw_c1d_type), INTENT(INOUT)                       :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: omega, scale_coul, scale_long
 
                            CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_gauss_damp_mix'
@@ -4091,11 +4087,10 @@ CONTAINS
                            omega_2 = omega*omega
                            omega_2 = 0.25_dp/omega_2
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw, omega_2, scale_coul, scale_long)
-                              pw%cc(:) = pw%cc(:)*(scale_coul + scale_long*EXP(-pw%pw_grid%gsq(:)*omega_2))
+                              pw%array = pw%array*(scale_coul + scale_long*EXP(-pw%pw_grid%gsq*omega_2))
 !$OMP END PARALLEL WORKSHARE
 
                            ELSE
@@ -4120,7 +4115,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_log_deriv_mix_cl(pw, omega, scale_coul, scale_long)
 
-                           TYPE(pw_type), INTENT(IN)                          :: pw
+                           TYPE(pw_c1d_type), INTENT(IN)                          :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: omega, scale_coul, scale_long
 
                            CHARACTER(len=*), PARAMETER :: routineN = 'pw_log_deriv_mix_cl'
@@ -4133,14 +4128,13 @@ CONTAINS
                            omega_2 = omega*omega
                            omega_2 = 0.25_dp/omega_2
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i,tmp) &
 !$OMP             SHARED(pw,omega_2,scale_long,scale_coul)
-                              DO i = 1, SIZE(pw%cc)
+                              DO i = 1, SIZE(pw%array)
                                  tmp = omega_2*pw%pw_grid%gsq(i)
-                                 pw%cc(i) = pw%cc(i)*(1.0_dp + scale_long*tmp*EXP(-tmp)/(scale_coul + scale_long*EXP(-tmp)))
+                                 pw%array(i) = pw%array(i)*(1.0_dp + scale_long*tmp*EXP(-tmp)/(scale_coul + scale_long*EXP(-tmp)))
                               END DO
 !$OMP END PARALLEL DO
 
@@ -4170,29 +4164,26 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_truncated(pw, rcutoff)
 
-                           TYPE(pw_type), INTENT(INOUT)                       :: pw
+                           TYPE(pw_c1d_type), INTENT(INOUT)                       :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: rcutoff
 
                            CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_truncated'
 
-                           INTEGER                                            :: cnt, handle, i
+                           INTEGER                                            :: handle, i
                            REAL(KIND=dp)                                      :: tmp
 
                            CALL timeset(routineN, handle)
                            CPASSERT(rcutoff >= 0)
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
-                              cnt = SIZE(pw%cc)
-
-!$OMP PARALLEL DO PRIVATE(i,tmp) DEFAULT(NONE) SHARED(cnt, pw, rcutoff)
-                              DO i = 1, cnt
+!$OMP PARALLEL DO PRIVATE(i,tmp) DEFAULT(NONE) SHARED(pw, rcutoff)
+                              DO i = 1, SIZE(pw%array)
                                  tmp = SQRT(pw%pw_grid%gsq(i))*rcutoff
                                  IF (tmp >= 0.005_dp) THEN
-                                    pw%cc(i) = pw%cc(i)*(1.0_dp - COS(tmp))
+                                    pw%array(i) = pw%array(i)*(1.0_dp - COS(tmp))
                                  ELSE
-                                    pw%cc(i) = pw%cc(i)*tmp**2/2.0_dp*(1.0 - tmp**2/12.0_dp)
+                                    pw%array(i) = pw%array(i)*tmp**2/2.0_dp*(1.0 - tmp**2/12.0_dp)
                                  END IF
                               END DO
 !$OMP END PARALLEL DO
@@ -4217,7 +4208,7 @@ CONTAINS
 ! **************************************************************************************************
                         SUBROUTINE pw_log_deriv_trunc(pw, rcutoff)
 
-                           TYPE(pw_type), INTENT(IN)                          :: pw
+                           TYPE(pw_c1d_type), INTENT(IN)                          :: pw
                            REAL(KIND=dp), INTENT(IN)                          :: rcutoff
 
                            CHARACTER(len=*), PARAMETER :: routineN = 'pw_log_deriv_trunc'
@@ -4228,19 +4219,18 @@ CONTAINS
                            CALL timeset(routineN, handle)
                            CPASSERT(rcutoff >= 0)
 
-                           IF (pw%in_space == RECIPROCALSPACE .AND. &
-                               pw%in_use == COMPLEXDATA1D) THEN
+                           IF (pw%in_space == RECIPROCALSPACE) THEN
 
                               rchalf = 0.5_dp*rcutoff
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i,tmp) &
 !$OMP             SHARED(pw,rchalf)
-                              DO i = 1, SIZE(pw%cc)
+                              DO i = 1, SIZE(pw%array)
                                  tmp = rchalf*SQRT(pw%pw_grid%gsq(i))
                                  ! For too small arguments, use the Taylor polynomial to prevent division by zero
                                  IF (ABS(tmp) >= 0.0001_dp) THEN
-                                    pw%cc(i) = pw%cc(i)*(1.0_dp - tmp/TAN(tmp))
+                                    pw%array(i) = pw%array(i)*(1.0_dp - tmp/TAN(tmp))
                                  ELSE
-                                    pw%cc(i) = pw%cc(i)*tmp**2*(1.0_dp + tmp**2/15.0_dp)/3.0_dp
+                                    pw%array(i) = pw%array(i)*tmp**2*(1.0_dp + tmp**2/15.0_dp)/3.0_dp
                                  END IF
                               END DO
 !$OMP END PARALLEL DO
