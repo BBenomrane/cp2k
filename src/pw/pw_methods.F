@@ -896,10 +896,7 @@ CONTAINS
 
          INTEGER                                            :: handle
          #:if kind=="c1d"
-            INTEGER                                            :: i, j, ng, ng1, ng2
-         #:endif
-         #:if kind[1]=="1"
-            INTEGER :: ns
+            INTEGER                                            :: i, j, ng, ng1, ng2, ns
          #:endif
          #:if kind[1]=="3"
             TYPE(pw_r3d_type) :: pw2_r3d
@@ -912,108 +909,100 @@ CONTAINS
                RETURN
             END IF
          #:endif
+         #:if kind[1]=="1"
+            TYPE(pw_c1d_type) :: pw2_c1d
+
+            IF (pw2%in_use == COMPLEXDATA1D .AND. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
+               pw2_c1d%in_space = pw2%in_space
+               pw2_c1d%pw_grid => pw2%pw_grid
+               pw2_c1d%array => pw2%cc
+               CALL pw_copy_${kind}$_c1d(pw1, pw2_c1d)
+               RETURN
+            END IF
+         #:endif
 
          CALL timeset(routineN, handle)
 
          CPASSERT(pw1%in_space == pw2%in_space)
 
-         IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-            IF (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical) THEN
-               IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
-                  #:if kind=="c1d"
-                     IF (pw2%in_use == COMPLEXDATA1D) THEN
-                        ng1 = SIZE(pw1%array)
-                        ng2 = SIZE(pw2%cc)
-                        ng = MIN(ng1, ng2)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, pw1, pw2)
-                        pw2%cc(1:ng) = pw1%array(1:ng)
-!$OMP END PARALLEL WORKSHARE
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, ng2, pw2)
-                        pw2%cc(ng + 1:ng2) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
-!$OMP END PARALLEL WORKSHARE
-                     ELSE
-                        CPABORT("No suitable data field!")
-                     END IF
-                  #:else
-                     CPABORT("No suitable data field!")
-                  #:endif
-               ELSE
-                  CPABORT("Incompatible grids")
-               END IF
-
-            ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
-                            pw2%pw_grid%spherical)) THEN
-               IF (.FALSE.) THEN
-!
-                  #:if kind=="c1d"
-                     ELSEIF (pw2%in_use == COMPLEXDATA1D) THEN
+         IF (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical) THEN
+            IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
+               #:if kind=="c1d"
+                  IF (pw2%in_use == COMPLEXDATA1D) THEN
                      ng1 = SIZE(pw1%array)
                      ng2 = SIZE(pw2%cc)
-                     ns = 2*MAX(ng1, ng2)
-                     IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
-                        IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                           DO i = 1, ng2
-                              j = pw2%pw_grid%gidx(i)
-                              pw2%cc(i) = pw1%array(j)
-                           END DO
-!$OMP END PARALLEL DO
-                        ELSE
-                           CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                           DO i = 1, ng1
-                              j = pw2%pw_grid%gidx(i)
-                              pw2%cc(j) = pw1%array(i)
-                           END DO
-!$OMP END PARALLEL DO
-                        END IF
-                     ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
-                        IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                           DO i = 1, ng2
-                              j = pw1%pw_grid%gidx(i)
-                              pw2%cc(i) = pw1%array(j)
-                           END DO
-!$OMP END PARALLEL DO
-                        ELSE
-                           CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                           DO i = 1, ng1
-                              j = pw1%pw_grid%gidx(i)
-                              pw2%cc(j) = pw1%array(i)
-                           END DO
-!$OMP END PARALLEL DO
-                        END IF
-                     ELSE
-                        CPABORT("")
-                        !CALL pw_copy_match(pw1, pw2)
-                     END IF
-                  #:endif
-               ELSE
-                  CPABORT("No suitable data field")
-               END IF
+                     ng = MIN(ng1, ng2)
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, pw1, pw2)
+                     pw2%cc(1:ng) = pw1%array(1:ng)
+!$OMP END PARALLEL WORKSHARE
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, ng2, pw2)
+                     pw2%cc(ng + 1:ng2) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
+!$OMP END PARALLEL WORKSHARE
+                  ELSE
+                     CPABORT("No suitable data field!")
+                  END IF
+               #:else
+                  CPABORT("No suitable data field!")
+               #:endif
             ELSE
                CPABORT("Incompatible grids")
             END IF
-         ELSE
+
+         ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
+                         pw2%pw_grid%spherical)) THEN
             IF (.FALSE.) THEN
 !
-               #:if kind=="r1d"
-                  ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
-                  ns = SIZE(pw1%array)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
-                  pw2%cc(1:ns) = pw1%array(1:ns)
-!$OMP END PARALLEL WORKSHARE
-               #:elif kind=="c1d"
-                  ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
-                  ns = SIZE(pw1%array)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
-                  pw2%cc(1:ns) = pw1%array(1:ns)
-!$OMP END PARALLEL WORKSHARE
+               #:if kind=="c1d"
+                  ELSEIF (pw2%in_use == COMPLEXDATA1D) THEN
+                  ng1 = SIZE(pw1%array)
+                  ng2 = SIZE(pw2%cc)
+                  ns = 2*MAX(ng1, ng2)
+                  IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
+                     IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                        DO i = 1, ng2
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%cc(i) = pw1%array(j)
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE
+                        CALL pw_zero(pw2)
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                        DO i = 1, ng1
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%cc(j) = pw1%array(i)
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
+                  ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
+                     IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                        DO i = 1, ng2
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%cc(i) = pw1%array(j)
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE
+                        CALL pw_zero(pw2)
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                        DO i = 1, ng1
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%cc(j) = pw1%array(i)
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
+                  ELSE
+                     pw2_c1d%in_space = pw2%in_space
+                     pw2_c1d%pw_grid => pw2%pw_grid
+                     pw2_c1d%array => pw2%cc
+                     CALL pw_copy_match(pw1, pw2_c1d)
+                  END IF
                #:endif
             ELSE
                CPABORT("No suitable data field")
             END IF
+         ELSE
+            CPABORT("Incompatible grids")
          END IF
          CALL timestop(handle)
       END SUBROUTINE pw_copy_${kind}$_pw
