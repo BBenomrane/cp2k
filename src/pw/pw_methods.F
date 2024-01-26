@@ -896,7 +896,7 @@ CONTAINS
 
          INTEGER                                            :: handle
          #:if kind=="c1d"
-            INTEGER                                            :: i, j, ng, ng1, ng2, ns
+            INTEGER                                            :: i, j, ng1, ng2, ns
          #:endif
          #:if kind[1]=="3"
             TYPE(pw_r3d_type) :: pw2_r3d
@@ -926,31 +926,8 @@ CONTAINS
 
          CPASSERT(pw1%in_space == pw2%in_space)
 
-         IF (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical) THEN
-            IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
-               #:if kind=="c1d"
-                  IF (pw2%in_use == COMPLEXDATA1D) THEN
-                     ng1 = SIZE(pw1%array)
-                     ng2 = SIZE(pw2%cc)
-                     ng = MIN(ng1, ng2)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, pw1, pw2)
-                     pw2%cc(1:ng) = pw1%array(1:ng)
-!$OMP END PARALLEL WORKSHARE
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, ng2, pw2)
-                     pw2%cc(ng + 1:ng2) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
-!$OMP END PARALLEL WORKSHARE
-                  ELSE
-                     CPABORT("No suitable data field!")
-                  END IF
-               #:else
-                  CPABORT("No suitable data field!")
-               #:endif
-            ELSE
-               CPABORT("Incompatible grids")
-            END IF
-
-         ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
-                         pw2%pw_grid%spherical)) THEN
+         IF (.NOT. (pw1%pw_grid%spherical .OR. &
+                    pw2%pw_grid%spherical)) THEN
             IF (.FALSE.) THEN
 !
                #:if kind=="c1d"
