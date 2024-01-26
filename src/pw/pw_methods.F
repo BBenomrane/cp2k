@@ -912,7 +912,8 @@ CONTAINS
          #:if kind[1]=="1"
             TYPE(pw_c1d_type) :: pw2_c1d
 
-            IF (pw2%in_use == COMPLEXDATA1D .AND. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
+            IF (pw2%in_use == COMPLEXDATA1D .AND. (ASSOCIATED(pw1%pw_grid, pw2%pw_grid) &
+                                                   .OR. (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical))) THEN
                pw2_c1d%in_space = pw2%in_space
                pw2_c1d%pw_grid => pw2%pw_grid
                pw2_c1d%array => pw2%cc
