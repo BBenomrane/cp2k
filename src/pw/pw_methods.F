@@ -1023,19 +1023,10 @@ CONTAINS
          TYPE(pw_type), INTENT(IN)                          :: pw1
          TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw2
 
-         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_copy'
-
-         INTEGER                                            :: handle
-         #:if kind[1]=="1"
-            INTEGER :: ns
-         #:endif
-         #:if kind=="c1d"
-            INTEGER                                            :: i, j, ng, ng1, ng2
-         #:endif
          #:if kind[1]=="3"
             TYPE(pw_r3d_type) :: pw1_r3d
 
-            IF (pw1%in_use == pw1%in_use) THEN
+            IF (pw1%in_use == REALDATA3D) THEN
                pw1_r3d%in_space = pw1%in_space
                pw1_r3d%pw_grid => pw1%pw_grid
                pw1_r3d%array => pw1%cr3d
@@ -1043,109 +1034,18 @@ CONTAINS
                RETURN
             END IF
          #:endif
-
-         CALL timeset(routineN, handle)
-
-         !CPASSERT(pw1%in_space == pw2%in_space)
-
-         IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-            IF (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical) THEN
-               IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
-                  #:if kind=="c1d"
-                     IF (pw1%in_use == COMPLEXDATA1D) THEN
-                        ng1 = SIZE(pw1%cc)
-                        ng2 = SIZE(pw2%array)
-                        ng = MIN(ng1, ng2)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, pw1, pw2)
-                        pw2%array(1:ng) = pw1%cc(1:ng)
-!$OMP END PARALLEL WORKSHARE
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ng, ng2, pw2)
-                        pw2%array(ng + 1:ng2) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
-!$OMP END PARALLEL WORKSHARE
-                     ELSE
-                        CPABORT("No suitable data field")
-                     END IF
-                  #:else
-                     CPABORT("")
-                  #:endif
-               ELSE
-                  CPABORT("Incompatible grids")
-               END IF
-
-            ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
-                            pw2%pw_grid%spherical)) THEN
-               IF (.FALSE.) THEN
-!
-                  #:if kind=="c1d"
-                     ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-                     ng1 = SIZE(pw1%cc)
-                     ng2 = SIZE(pw2%array)
-                     ns = 2*MAX(ng1, ng2)
-                     IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
-                        IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                           DO i = 1, ng2
-                              j = pw2%pw_grid%gidx(i)
-                              pw2%array(i) = pw1%cc(j)
-                           END DO
-!$OMP END PARALLEL DO
-                        ELSE
-                           CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                           DO i = 1, ng1
-                              j = pw2%pw_grid%gidx(i)
-                              pw2%array(j) = pw1%cc(i)
-                           END DO
-!$OMP END PARALLEL DO
-                        END IF
-                     ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
-                        IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                           DO i = 1, ng2
-                              j = pw1%pw_grid%gidx(i)
-                              pw2%array(i) = pw1%cc(j)
-                           END DO
-!$OMP END PARALLEL DO
-                        ELSE
-                           CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                           DO i = 1, ng1
-                              j = pw1%pw_grid%gidx(i)
-                              pw2%array(j) = pw1%cc(i)
-                           END DO
-!$OMP END PARALLEL DO
-                        END IF
-                     ELSE
-                        CPABORT("")
-                        !CALL pw_copy_match(pw1, pw2)
-                     END IF
-                  #:endif
-               ELSE
-                  CPABORT("No suitable data field")
-               END IF
-            ELSE
-               CPABORT("Incompatible grids")
+         #:if kind[1]=="1"
+            TYPE(pw_c1d_type) :: pw1_c1d
+            IF (pw1%in_use == COMPLEXDATA1D) THEN
+               pw1_c1d%in_space = pw1%in_space
+               pw1_c1d%pw_grid => pw1%pw_grid
+               pw1_c1d%array => pw1%cc
+               CALL pw_copy_c1d_${kind}$ (pw1_c1d, pw2)
+               RETURN
             END IF
-         ELSE
-            IF (.FALSE.) THEN
-!
-               #:if kind=="r1d"
-                  ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-                  ns = SIZE(pw1%cc)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
-                  pw2%array(1:ns) = REAL(pw1%cc(1:ns), KIND=dp)
-!$OMP END PARALLEL WORKSHARE
-               #:elif kind=="c1d"
-                  ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
-                  pw2%array(1:ns) = pw1%cc(1:ns)
-!$OMP END PARALLEL WORKSHARE
-               #:endif
-            ELSE
-               CPABORT("No suitable data field")
-            END IF
-         END IF
-         CALL timestop(handle)
+         #:endif
+         CPABORT("")
+
       END SUBROUTINE pw_copy_pw_${kind}$
 
 ! **************************************************************************************************
