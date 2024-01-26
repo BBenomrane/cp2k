@@ -901,6 +901,17 @@ CONTAINS
          #:if kind[1]=="1"
             INTEGER :: ns
          #:endif
+         #:if kind[1]=="3"
+            TYPE(pw_r3d_type) :: pw2_r3d
+
+            IF (pw2%in_use == REALDATA3D) THEN
+               pw2_r3d%in_space = pw2%in_space
+               pw2_r3d%pw_grid => pw2%pw_grid
+               pw2_r3d%array => pw2%cr3d
+               CALL pw_copy_${kind}$_r3d(pw1, pw2_r3d)
+               RETURN
+            END IF
+         #:endif
 
          CALL timeset(routineN, handle)
 
@@ -977,16 +988,6 @@ CONTAINS
                         CPABORT("")
                         !CALL pw_copy_match(pw1, pw2)
                      END IF
-                  #:elif kind=="r3d"
-                     ELSE IF (pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                     pw2%cr3d(:, :, :) = pw1%array(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-                  #:elif kind=="c3d"
-                     ELSE IF (pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                     pw2%cr3d(:, :, :) = REAL(pw1%array(:, :, :), KIND=dp)
-!$OMP END PARALLEL WORKSHARE
                   #:endif
                ELSE
                   CPABORT("No suitable data field")
@@ -1009,16 +1010,6 @@ CONTAINS
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
                   pw2%cc(1:ns) = pw1%array(1:ns)
 !$OMP END PARALLEL WORKSHARE
-               #:elif kind=="r3d"
-                  ELSE IF (pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                  pw2%cr3d(:, :, :) = pw1%array(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-               #:else
-                  ELSE IF (pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                  pw2%cr3d(:, :, :) = REAL(pw1%array(:, :, :), KIND=dp)
-!$OMP END PARALLEL WORKSHARE
                #:endif
             ELSE
                CPABORT("No suitable data field")
@@ -1040,6 +1031,17 @@ CONTAINS
          #:endif
          #:if kind=="c1d"
             INTEGER                                            :: i, j, ng, ng1, ng2
+         #:endif
+         #:if kind[1]=="3"
+            TYPE(pw_r3d_type) :: pw1_r3d
+
+            IF (pw1%in_use == pw1%in_use) THEN
+               pw1_r3d%in_space = pw1%in_space
+               pw1_r3d%pw_grid => pw1%pw_grid
+               pw1_r3d%array => pw1%cr3d
+               CALL pw_copy_r3d_${kind}$ (pw1_r3d, pw2)
+               RETURN
+            END IF
          #:endif
 
          CALL timeset(routineN, handle)
@@ -1117,16 +1119,6 @@ CONTAINS
                         CPABORT("")
                         !CALL pw_copy_match(pw1, pw2)
                      END IF
-                  #:elif kind=="r3d"
-                     ELSE IF (pw1%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                     pw2%array(:, :, :) = pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-                  #:elif kind=="c3d"
-                     ELSE IF (pw1%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                     pw2%array(:, :, :) = pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
                   #:endif
                ELSE
                   CPABORT("No suitable data field")
@@ -1147,16 +1139,6 @@ CONTAINS
                   ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(ns, pw1, pw2)
                   pw2%array(1:ns) = pw1%cc(1:ns)
-!$OMP END PARALLEL WORKSHARE
-               #:elif kind=="r3d"
-                  ELSE IF (pw1%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                  pw2%array(:, :, :) = pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-               #:else
-                  ELSE IF (pw1%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                  pw2%array(:, :, :) = pw1%cr3d(:, :, :)
 !$OMP END PARALLEL WORKSHARE
                #:endif
             ELSE
@@ -2419,7 +2401,7 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
             END IF
          #:else
-            IF (.NOT. pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
+            IF (ANY(SHAPE(pw2%array) /= SHAPE(pw1%array))) &
                CPABORT("3D grids must be compatible!")
             IF (pw1%pw_grid%spherical) &
                CPABORT("3D grids must not be spherical!")
