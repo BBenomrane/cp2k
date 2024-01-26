@@ -1144,8 +1144,8 @@ CONTAINS
       TYPE(pw_c1d_type) :: influence_fn, tmpg
       TYPE(pw_type)                                      ::  rhog, &
                                                             rhog_aux, rhor, vhartree_rs
-      TYPE(pw_c1d_type) :: my_rhog, my_density_c1d
-      TYPE(pw_r3d_type) :: my_density_r3d
+      TYPE(pw_c1d_type) :: my_rhog, my_density_c1d, my_vhartree_c1d
+      TYPE(pw_r3d_type) :: my_density_r3d, my_vhartree_r3d
 
       CALL timeset(routineN, handle)
 
@@ -1175,6 +1175,12 @@ CONTAINS
       my_density_r3d%in_space = density%in_space
       my_density_r3d%array => density%cr3d
       my_density_r3d%pw_grid => density%pw_grid
+      my_vhartree_c1d%in_space = vhartree%in_space
+      my_vhartree_c1d%array => vhartree%cc
+      my_vhartree_c1d%pw_grid => vhartree%pw_grid
+      my_vhartree_r3d%in_space = vhartree%in_space
+      my_vhartree_r3d%array => vhartree%cr3d
+      my_vhartree_r3d%pw_grid => vhartree%pw_grid
 
       SELECT CASE (poisson_env%used_grid)
       CASE (use_gs_grid)
@@ -1203,7 +1209,13 @@ CONTAINS
                CALL pw_multiply_with(rhog_aux, influence_fn)
             END IF
             IF (PRESENT(vhartree)) THEN
-               CALL pw_transfer(rhog, vhartree)
+               IF (vhartree%in_use == REALDATA3D) THEN
+                  CALL pw_transfer(my_rhog, my_vhartree_r3d)
+               ELSE IF (vhartree%in_use == COMPLEXDATA1D) THEN
+                  CALL pw_transfer(my_rhog, my_vhartree_c1d)
+               ELSE
+                  CPABORT("")
+               END IF
                IF (PRESENT(ehartree)) THEN
                   IF (PRESENT(aux_density)) THEN
                      ehartree = 0.5_dp*pw_integral_ab(aux_density, vhartree)
@@ -1260,7 +1272,7 @@ CONTAINS
             END SELECT
 
             IF (PRESENT(vhartree)) CALL pw_transfer(vhartree_rs, vhartree)
-            IF (PRESENT(dvhartree)) CALL pw_transfer(rhor, rhog)
+            IF (PRESENT(dvhartree)) CALL pw_transfer(rhor, my_rhog)
             IF (PRESENT(h_stress)) THEN
                CPABORT("No stress tensor is implemented for the implicit Poisson solver.")
             END IF
@@ -1290,7 +1302,7 @@ CONTAINS
             ehartree = 0.5_dp*pw_integral_ab(density, rhor)
          END IF
          IF (PRESENT(h_stress) .OR. PRESENT(dvhartree)) THEN
-            CALL pw_transfer(rhor, rhog)
+            CALL pw_transfer(rhor, my_rhog)
          END IF
          CALL pw_pool%give_back_pw(rhor)
 
@@ -1298,10 +1310,7 @@ CONTAINS
 
       IF (PRESENT(dvhartree)) THEN
          BLOCK
-            TYPE(pw_c1d_type) :: my_rhog, my_rhog_aux
-            my_rhog%in_space = rhog%in_space
-            my_rhog%array => rhog%cc
-            my_rhog%pw_grid => rhog%pw_grid
+            TYPE(pw_c1d_type) :: my_rhog_aux
             IF (PRESENT(aux_density)) THEN
                my_rhog_aux%in_space = rhog_aux%in_space
                my_rhog_aux%array => rhog_aux%cc
@@ -1343,10 +1352,7 @@ CONTAINS
          END BLOCK
       ELSE IF (PRESENT(h_stress)) THEN
          BLOCK
-            TYPE(pw_c1d_type) :: my_rhog, my_rhog_aux
-            my_rhog%in_space = rhog%in_space
-            my_rhog%array => rhog%cc
-            my_rhog%pw_grid => rhog%pw_grid
+            TYPE(pw_c1d_type) :: my_rhog_aux
             IF (PRESENT(aux_density)) THEN
                my_rhog_aux%in_space = rhog_aux%in_space
                my_rhog_aux%array => rhog_aux%cc
