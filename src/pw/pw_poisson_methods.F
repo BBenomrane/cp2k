@@ -1169,8 +1169,24 @@ CONTAINS
 
          SELECT CASE (poisson_env%green_fft%method)
          CASE (PERIODIC3D, ANALYTIC2D, ANALYTIC1D, ANALYTIC0D, MT2D, MT1D, MT0D, MULTIPOLE0D)
-
-            CALL pw_transfer(density, rhog)
+            BLOCK
+               TYPE(pw_c1d_type) :: my_rhog, my_density_c1d
+               TYPE(pw_r3d_type) :: my_density_r3d
+               my_rhog%in_space = rhog%in_space
+               my_rhog%array => rhog%cc
+               my_rhog%pw_grid => rhog%pw_grid
+               my_density_c1d%in_space = density%in_space
+               my_density_c1d%array => density%cc
+               my_density_c1d%pw_grid => density%pw_grid
+               my_density_r3d%in_space = density%in_space
+               my_density_r3d%array => density%cr3d
+               my_density_r3d%pw_grid => density%pw_grid
+               IF (density%in_use == REALDATA3D) THEN
+                  CALL pw_transfer(my_density_r3d, my_rhog)
+               ELSE
+                  CALL pw_transfer(my_density_c1d, my_rhog)
+               END IF
+            END BLOCK
             IF (PRESENT(aux_density)) THEN
                CALL pw_transfer(aux_density, rhog_aux)
             END IF
