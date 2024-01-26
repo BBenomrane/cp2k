@@ -3450,10 +3450,8 @@ CONTAINS
                            TYPE(pw_type), INTENT(IN)                          :: pw1
                            TYPE(pw_type), INTENT(INOUT)                       :: pw2
 
-                           CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_copy'
-
-                           INTEGER                                            :: handle, i, j, ng, ng1, ng2, ns, out_unit
                            TYPE(pw_r3d_type) :: pw1_r3d
+                           TYPE(pw_c1d_type) :: pw1_c1d
 
                            IF (pw1%in_use == REALDATA3D) THEN
                               pw1_r3d%in_space = pw1%in_space
@@ -3462,151 +3460,14 @@ CONTAINS
                               CALL pw_copy(pw1_r3d, pw2)
                               RETURN
                            END IF
-
-                           CALL timeset(routineN, handle)
-
-                           !CPASSERT(pw1%in_space == pw2%in_space)
-
-                           out_unit = cp_logger_get_default_io_unit()
-
-                           IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-
-                              IF (pw1%pw_grid%spherical .AND. pw2%pw_grid%spherical) THEN
-
-                                 IF (pw_compatible(pw1%pw_grid, pw2%pw_grid)) THEN
-
-                                    IF (pw1%in_use == COMPLEXDATA1D .AND. &
-                                        pw2%in_use == COMPLEXDATA1D) THEN
-                                       ng1 = SIZE(pw1%cc)
-                                       ng2 = SIZE(pw2%cc)
-                                       ng = MIN(ng1, ng2)
-!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(ng, pw1, pw2)
-                                       DO i = 1, ng
-                                          pw2%cc(i) = pw1%cc(i)
-                                       END DO
-!$OMP END PARALLEL DO
-                                       IF (ng2 > ng) THEN
-!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(ng, ng2, pw2)
-                                          DO i = ng + 1, ng2
-                                             pw2%cc(i) = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
-                                          END DO
-!$OMP END PARALLEL DO
-                                       END IF
-                                       ns = 2*MAX(ng1, ng2)
-                                    ELSE
-                                       CPABORT("No suitable data field")
-                                    END IF
-
-                                 ELSE
-                                    IF (out_unit > 0) THEN
-                                       WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
-                                          " grid 1 :", pw1%pw_grid%id_nr, &
-                                          " spherical :", pw1%pw_grid%spherical, &
-                                          " reference :", pw1%pw_grid%reference
-                                       WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
-                                          " grid 2 :", pw2%pw_grid%id_nr, &
-                                          " spherical :", pw2%pw_grid%spherical, &
-                                          " reference :", pw2%pw_grid%reference
-                                    END IF
-                                    CPABORT("Incompatible grids")
-                                 END IF
-
-                              ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
-                                              pw2%pw_grid%spherical)) THEN
-
-                                 IF (pw1%in_use == COMPLEXDATA1D .AND. &
-                                     pw2%in_use == COMPLEXDATA1D) THEN
-
-                                    ng1 = SIZE(pw1%cc)
-                                    ng2 = SIZE(pw2%cc)
-                                    ns = 2*MAX(ng1, ng2)
-
-                                    IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
-                                       IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                                          DO i = 1, ng2
-                                             j = pw2%pw_grid%gidx(i)
-                                             pw2%cc(i) = pw1%cc(j)
-                                          END DO
-!$OMP END PARALLEL DO
-                                       ELSE
-                                          CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                                          DO i = 1, ng1
-                                             j = pw2%pw_grid%gidx(i)
-                                             pw2%cc(j) = pw1%cc(i)
-                                          END DO
-!$OMP END PARALLEL DO
-                                       END IF
-                                    ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
-                                       IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                                          DO i = 1, ng2
-                                             j = pw1%pw_grid%gidx(i)
-                                             pw2%cc(i) = pw1%cc(j)
-                                          END DO
-!$OMP END PARALLEL DO
-                                       ELSE
-                                          CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                                          DO i = 1, ng1
-                                             j = pw1%pw_grid%gidx(i)
-                                             pw2%cc(j) = pw1%cc(i)
-                                          END DO
-!$OMP END PARALLEL DO
-                                       END IF
-                                    ELSE
-                                       !IF (out_unit > 0) THEN
-                                       !   WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
-                                       !      " grid 1 :", pw1%pw_grid%id_nr, &
-                                       !      " spherical :", pw1%pw_grid%spherical, &
-                                       !      " reference :", pw1%pw_grid%reference
-                                       !   WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
-                                       !      " grid 2 :", pw2%pw_grid%id_nr, &
-                                       !      " spherical :", pw2%pw_grid%spherical, &
-                                       !      " reference :", pw2%pw_grid%reference
-                                       !END IF
-                                       CALL pw_copy_match(pw1, pw2)
-                                    END IF
-
-                                 ELSE
-                                    CPABORT("No suitable data field")
-                                 END IF
-
-                              ELSE
-
-                                 IF (out_unit > 0) THEN
-                                    WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
-                                       " grid 1 :", pw1%pw_grid%id_nr, &
-                                       " spherical :", pw1%pw_grid%spherical, &
-                                       " reference :", pw1%pw_grid%reference
-                                    WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
-                                       " grid 2 :", pw2%pw_grid%id_nr, &
-                                       " spherical :", pw2%pw_grid%spherical, &
-                                       " reference :", pw2%pw_grid%reference
-                                 END IF
-
-                                 CPABORT("Incompatible grids")
-
-                              END IF
-
-                           ELSE
-
-                              IF (pw1%in_use == COMPLEXDATA1D .AND. &
-                                  pw2%in_use == COMPLEXDATA1D) THEN
-                                 ns = SIZE(pw1%cc)
-!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(ns, pw1, pw2)
-                                 DO i = 1, ns
-                                    pw2%cc(i) = pw1%cc(i)
-                                 END DO
-!$OMP END PARALLEL DO
-                              ELSE
-                                 CPABORT("No suitable data field")
-                              END IF
-
+                           IF (pw1%in_use == COMPLEXDATA1D) THEN
+                              pw1_c1d%in_space = pw1%in_space
+                              pw1_c1d%pw_grid => pw1%pw_grid
+                              pw1_c1d%array => pw1%cc
+                              CALL pw_copy(pw1_c1d, pw2)
+                              RETURN
                            END IF
-
-                           CALL timestop(handle)
+                           CPABORT("")
 
                         END SUBROUTINE pw_copy_pw_pw
 
