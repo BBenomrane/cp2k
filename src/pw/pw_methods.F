@@ -2192,6 +2192,8 @@ CONTAINS
             CPABORT("Both grids must be in the same space!")
          IF (pw1%pw_grid%spherical .neqv. pw2%pw_grid%spherical) &
             CPABORT("Both grids must be either spherical or non-spherical!")
+         IF (pw1%pw_grid%spherical .AND. .NOT. pw1%in_space == RECIPROCALSPACE) &
+            CPABORT("Spherical grids only exist in reciprocal space!")
 
          #:if kind[1]=='1'
             IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
@@ -2209,59 +2211,56 @@ CONTAINS
 !$OMP END PARALLEL WORKSHARE
                      END IF
                   ELSE
-                     ng1 = SIZE(pw1%array)
-                     ng2 = SIZE(pw2%array)
-                     ns = 2*MAX(ng1, ng2)
-
-                     IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
-                        IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                           DO i = 1, ng2
-                              j = pw2%pw_grid%gidx(i)
-                              pw2%array(i) = ${type2type("pw1%array(j)", kind, kind2)}$
-                           END DO
-!$OMP END PARALLEL DO
-                        ELSE
-                           CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                           DO i = 1, ng1
-                              j = pw2%pw_grid%gidx(i)
-                              pw2%array(j) = ${type2type("pw1%array(i)", kind, kind2)}$
-                           END DO
-!$OMP END PARALLEL DO
-                        END IF
-                     ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
-                        IF (ng1 >= ng2) THEN
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
-                           DO i = 1, ng2
-                              j = pw1%pw_grid%gidx(i)
-                              pw2%array(i) = ${type2type("pw1%array(j)", kind, kind2)}$
-                           END DO
-!$OMP END PARALLEL DO
-                        ELSE
-                           CALL pw_zero(pw2)
-!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
-                           DO i = 1, ng1
-                              j = pw1%pw_grid%gidx(i)
-                              pw2%array(j) = ${type2type("pw1%array(i)", kind, kind2)}$
-                           END DO
-!$OMP END PARALLEL DO
-                        END IF
-                     ELSE
-                        #:if kind=='c1d' and kind2=='c1d'
-                           CALL pw_copy_match(pw1, pw2)
-                        #:else
-                           CPABORT("Copy not implemented!")
-                        #:endif
-                     END IF
+                     CPABORT("Copies between spherical grids require compatible grids!")
                   END IF
+               ELSE
+                  ng1 = SIZE(pw1%array)
+                  ng2 = SIZE(pw2%array)
+                  ns = 2*MAX(ng1, ng2)
 
-               ELSE IF (.NOT. (pw1%pw_grid%spherical .OR. &
-                               pw2%pw_grid%spherical)) THEN
-!$OMP PARALLEL WORKSHARE PRIVATE(i) DEFAULT(NONE) SHARED(ns, pw1, pw2)
-                  pw2%array(1:ns) = ${type2type("pw1%array(1:ns)", kind, kind2)}$
-!$OMP END PARALLEL WORKSHARE
+                  IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
+                     IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                        DO i = 1, ng2
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%array(i) = ${type2type("pw1%array(j)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE
+                        CALL pw_zero(pw2)
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                        DO i = 1, ng1
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%array(j) = ${type2type("pw1%array(i)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
+                  ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
+                     IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                        DO i = 1, ng2
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%array(i) = ${type2type("pw1%array(j)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE
+                        CALL pw_zero(pw2)
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                        DO i = 1, ng1
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%array(j) = ${type2type("pw1%array(i)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
+                  ELSE
+                     #:if kind=='c1d' and kind2=='c1d'
+                        CALL pw_copy_match(pw1, pw2)
+                     #:else
+                        CPABORT("Copy not implemented!")
+                     #:endif
+                  END IF
                END IF
+
             ELSE
 !$OMP PARALLEL WORKSHARE PRIVATE(i) DEFAULT(NONE) SHARED(pw1, pw2)
                pw2%array = ${type2type("pw1%array", kind, kind2)}$
