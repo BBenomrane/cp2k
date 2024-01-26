@@ -3471,6 +3471,15 @@ CONTAINS
                            CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_copy'
 
                            INTEGER                                            :: handle, i, j, ng, ng1, ng2, ns, out_unit
+                           TYPE(pw_r3d_type) :: pw1_r3d
+
+                           IF (pw1%in_use == REALDATA3D) THEN
+                              pw1_r3d%in_space = pw1%in_space
+                              pw1_r3d%pw_grid => pw1%pw_grid
+                              pw1_r3d%array => pw1%cr3d
+                              CALL pw_copy(pw1_r3d, pw2)
+                              RETURN
+                           END IF
 
                            CALL timeset(routineN, handle)
 
@@ -3578,10 +3587,6 @@ CONTAINS
                                        CALL pw_copy_match(pw1, pw2)
                                     END IF
 
-                                 ELSE IF (pw1%in_use == REALDATA3D .AND. pw1%in_use == pw2%in_use) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                                    pw2%cr3d(:, :, :) = pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
                                  ELSE
                                     CPABORT("No suitable data field")
                                  END IF
@@ -3613,11 +3618,6 @@ CONTAINS
                                     pw2%cc(i) = pw1%cc(i)
                                  END DO
 !$OMP END PARALLEL DO
-                              ELSE IF (pw1%in_use == REALDATA3D .AND. pw2%in_use == REALDATA3D) THEN
-                                 ns = SIZE(pw1%cr3d)
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                                 pw2%cr3d(:, :, :) = pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
                               ELSE
                                  CPABORT("No suitable data field")
                               END IF
