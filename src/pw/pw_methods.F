@@ -4618,18 +4618,22 @@ CONTAINS
                            CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_transfer'
 
                            INTEGER                                            :: handle
+                           TYPE(pw_r3d_type) :: pw1_r3d
+
+                           IF (pw1%in_use == REALDATA3D) THEN
+                              pw1_r3d%in_space = pw1%in_space
+                              pw1_r3d%pw_grid => pw1%pw_grid
+                              pw1_r3d%array => pw1%cr3d
+                              CALL pw_transfer(pw1_r3d, pw2, debug)
+                              RETURN
+                           END IF
 
                            CALL timeset(routineN, handle)
                            !sample peak memory
                            CALL m_memory()
 
-                           IF (pw1%in_space == REALSPACE .AND. pw2%in_space == REALSPACE) THEN
-
-                              ! simple copy should do
-                              CALL pw_copy(pw1, pw2)
-
-                           ELSE IF (pw1%in_space == RECIPROCALSPACE .AND. &
-                                    pw2%in_space == RECIPROCALSPACE) THEN
+                           IF (pw1%in_space == RECIPROCALSPACE .AND. &
+                               pw2%in_space == RECIPROCALSPACE) THEN
 
                               IF (pw1%in_use == pw2%in_use) THEN
 
