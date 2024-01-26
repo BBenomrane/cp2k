@@ -1142,9 +1142,8 @@ CONTAINS
       TYPE(pw_grid_type), POINTER                        :: pw_grid
       TYPE(pw_pool_type), POINTER                        :: pw_pool
       TYPE(pw_c1d_type) :: influence_fn, tmpg
-      TYPE(pw_type)                                      ::  rhog, &
-                                                            rhog_aux, rhor, vhartree_rs
-      TYPE(pw_c1d_type) :: my_rhog, my_density_c1d, my_vhartree_c1d
+      TYPE(pw_type)                                      ::  rhor, vhartree_rs
+      TYPE(pw_c1d_type) :: rhog, rhog_aux, my_density_c1d, my_vhartree_c1d
       TYPE(pw_r3d_type) :: my_density_r3d, my_vhartree_r3d
 
       CALL timeset(routineN, handle)
@@ -1161,14 +1160,11 @@ CONTAINS
             CPABORT("vhartree has a different grid than the poisson solver")
       END IF
       ! density in G space
-      CALL pw_pool%create_pw(rhog, use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
+      CALL pw_pool%create_pw(rhog, in_space=RECIPROCALSPACE)
       IF (PRESENT(aux_density)) THEN
-         CALL pw_pool%create_pw(rhog_aux, use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
+         CALL pw_pool%create_pw(rhog_aux, in_space=RECIPROCALSPACE)
       END IF
 
-      my_rhog%in_space = rhog%in_space
-      my_rhog%array => rhog%cc
-      my_rhog%pw_grid => rhog%pw_grid
       my_density_c1d%in_space = density%in_space
       my_density_c1d%array => density%cc
       my_density_c1d%pw_grid => density%pw_grid
@@ -1188,31 +1184,31 @@ CONTAINS
          SELECT CASE (poisson_env%green_fft%method)
          CASE (PERIODIC3D, ANALYTIC2D, ANALYTIC1D, ANALYTIC0D, MT2D, MT1D, MT0D, MULTIPOLE0D)
             IF (density%in_use == REALDATA3D) THEN
-               CALL pw_transfer(my_density_r3d, my_rhog)
+               CALL pw_transfer(my_density_r3d, rhog)
             ELSE
-               CALL pw_transfer(my_density_c1d, my_rhog)
+               CALL pw_transfer(my_density_c1d, rhog)
             END IF
             IF (PRESENT(aux_density)) THEN
                CALL pw_transfer(aux_density, rhog_aux)
             END IF
             IF (PRESENT(ehartree) .AND. (.NOT. PRESENT(vhartree))) THEN
                CALL pw_pool%create_pw(tmpg, in_space=RECIPROCALSPACE)
-               CALL pw_copy(my_rhog, tmpg)
+               CALL pw_copy(rhog, tmpg)
             END IF
             IF (PRESENT(greenfn)) THEN
                influence_fn = greenfn
             ELSE
                influence_fn = poisson_env%green_fft%influence_fn
             END IF
-            CALL pw_multiply_with(my_rhog, influence_fn)
+            CALL pw_multiply_with(rhog, influence_fn)
             IF (PRESENT(aux_density)) THEN
                CALL pw_multiply_with(rhog_aux, influence_fn)
             END IF
             IF (PRESENT(vhartree)) THEN
                IF (vhartree%in_use == REALDATA3D) THEN
-                  CALL pw_transfer(my_rhog, my_vhartree_r3d)
+                  CALL pw_transfer(rhog, my_vhartree_r3d)
                ELSE IF (vhartree%in_use == COMPLEXDATA1D) THEN
-                  CALL pw_transfer(my_rhog, my_vhartree_c1d)
+                  CALL pw_transfer(rhog, my_vhartree_c1d)
                ELSE
                   CPABORT("")
                END IF
@@ -1224,7 +1220,7 @@ CONTAINS
                   END IF
                END IF
             ELSE IF (PRESENT(ehartree)) THEN
-               ehartree = 0.5_dp*pw_integral_ab(my_rhog, tmpg)
+               ehartree = 0.5_dp*pw_integral_ab(rhog, tmpg)
                CALL pw_pool%give_back_pw(tmpg)
             END IF
 
@@ -1272,7 +1268,7 @@ CONTAINS
             END SELECT
 
             IF (PRESENT(vhartree)) CALL pw_transfer(vhartree_rs, vhartree)
-            IF (PRESENT(dvhartree)) CALL pw_transfer(rhor, my_rhog)
+            IF (PRESENT(dvhartree)) CALL pw_transfer(rhor, rhog)
             IF (PRESENT(h_stress)) THEN
                CPABORT("No stress tensor is implemented for the implicit Poisson solver.")
             END IF
@@ -1302,67 +1298,52 @@ CONTAINS
             ehartree = 0.5_dp*pw_integral_ab(density, rhor)
          END IF
          IF (PRESENT(h_stress) .OR. PRESENT(dvhartree)) THEN
-            CALL pw_transfer(rhor, my_rhog)
+            CALL pw_transfer(rhor, rhog)
          END IF
          CALL pw_pool%give_back_pw(rhor)
 
       END SELECT
 
       IF (PRESENT(dvhartree)) THEN
-         BLOCK
-            TYPE(pw_c1d_type) :: my_rhog_aux
-            IF (PRESENT(aux_density)) THEN
-               my_rhog_aux%in_space = rhog_aux%in_space
-               my_rhog_aux%array => rhog_aux%cc
-               my_rhog_aux%pw_grid => rhog_aux%pw_grid
-            END IF
-            IF (dvhartree(1)%in_use == REALDATA3D) THEN
-               BLOCK
-                  TYPE(pw_r3d_type) :: my_dvhartree(3)
-                  INTEGER :: i
-                  DO i = 1, 3
-                     my_dvhartree(i)%in_space = dvhartree(i)%in_space
-                     my_dvhartree(i)%pw_grid => dvhartree(i)%pw_grid
-                     my_dvhartree(i)%array => dvhartree(i)%cr3d
-                  END DO
-                  IF (PRESENT(aux_density)) THEN
-           CALL calc_stress_and_gradient_r3d(poisson_env, my_rhog, ehartree, my_rhog_aux, h_stress=h_stress, dvhartree=my_dvhartree)
-                  ELSE
-                     CALL calc_stress_and_gradient_r3d(poisson_env, my_rhog, ehartree, h_stress=h_stress, dvhartree=my_dvhartree)
-                  END IF
-               END BLOCK
-            ELSE IF (dvhartree(1)%in_use == COMPLEXDATA1D) THEN
-               BLOCK
-                  TYPE(pw_c1d_type) :: my_dvhartree(3)
-                  INTEGER :: i
-                  DO i = 1, 3
-                     my_dvhartree(i)%in_space = dvhartree(i)%in_space
-                     my_dvhartree(i)%pw_grid => dvhartree(i)%pw_grid
-                     my_dvhartree(i)%array => dvhartree(i)%cc
-                  END DO
-                  IF (PRESENT(aux_density)) THEN
-           CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, my_rhog_aux, h_stress=h_stress, dvhartree=my_dvhartree)
-                  ELSE
-                     CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, h_stress=h_stress, dvhartree=my_dvhartree)
-                  END IF
-               END BLOCK
-            ELSE
-               CPABORT("Grid type not supported!")
-            END IF
-         END BLOCK
+         IF (dvhartree(1)%in_use == REALDATA3D) THEN
+            BLOCK
+               TYPE(pw_r3d_type) :: my_dvhartree(3)
+               INTEGER :: i
+               DO i = 1, 3
+                  my_dvhartree(i)%in_space = dvhartree(i)%in_space
+                  my_dvhartree(i)%pw_grid => dvhartree(i)%pw_grid
+                  my_dvhartree(i)%array => dvhartree(i)%cr3d
+               END DO
+               IF (PRESENT(aux_density)) THEN
+                 CALL calc_stress_and_gradient_r3d(poisson_env, rhog, ehartree, rhog_aux, h_stress=h_stress, dvhartree=my_dvhartree)
+               ELSE
+                  CALL calc_stress_and_gradient_r3d(poisson_env, rhog, ehartree, h_stress=h_stress, dvhartree=my_dvhartree)
+               END IF
+            END BLOCK
+         ELSE IF (dvhartree(1)%in_use == COMPLEXDATA1D) THEN
+            BLOCK
+               TYPE(pw_c1d_type) :: my_dvhartree(3)
+               INTEGER :: i
+               DO i = 1, 3
+                  my_dvhartree(i)%in_space = dvhartree(i)%in_space
+                  my_dvhartree(i)%pw_grid => dvhartree(i)%pw_grid
+                  my_dvhartree(i)%array => dvhartree(i)%cc
+               END DO
+               IF (PRESENT(aux_density)) THEN
+                 CALL calc_stress_and_gradient_c1d(poisson_env, rhog, ehartree, rhog_aux, h_stress=h_stress, dvhartree=my_dvhartree)
+               ELSE
+                  CALL calc_stress_and_gradient_c1d(poisson_env, rhog, ehartree, h_stress=h_stress, dvhartree=my_dvhartree)
+               END IF
+            END BLOCK
+         ELSE
+            CPABORT("Grid type not supported!")
+         END IF
       ELSE IF (PRESENT(h_stress)) THEN
-         BLOCK
-            TYPE(pw_c1d_type) :: my_rhog_aux
-            IF (PRESENT(aux_density)) THEN
-               my_rhog_aux%in_space = rhog_aux%in_space
-               my_rhog_aux%array => rhog_aux%cc
-               my_rhog_aux%pw_grid => rhog_aux%pw_grid
-
-               CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, my_rhog_aux, h_stress=h_stress)
-            ELSE
-               CALL calc_stress_and_gradient_c1d(poisson_env, my_rhog, ehartree, h_stress=h_stress)
-            END IF
-         END BLOCK
+         IF (PRESENT(aux_density)) THEN
+            CALL calc_stress_and_gradient_c1d(poisson_env, rhog, ehartree, rhog_aux, h_stress=h_stress)
+         ELSE
+            CALL calc_stress_and_gradient_c1d(poisson_env, rhog, ehartree, h_stress=h_stress)
+         END IF
       END IF
 
       CALL pw_pool%give_back_pw(rhog)
