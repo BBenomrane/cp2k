@@ -1144,6 +1144,8 @@ CONTAINS
       TYPE(pw_c1d_type) :: influence_fn, tmpg
       TYPE(pw_type)                                      ::  rhog, &
                                                             rhog_aux, rhor, vhartree_rs
+      TYPE(pw_c1d_type) :: my_rhog, my_density_c1d
+      TYPE(pw_r3d_type) :: my_density_r3d
 
       CALL timeset(routineN, handle)
 
@@ -1164,42 +1166,39 @@ CONTAINS
          CALL pw_pool%create_pw(rhog_aux, use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
       END IF
 
+      my_rhog%in_space = rhog%in_space
+      my_rhog%array => rhog%cc
+      my_rhog%pw_grid => rhog%pw_grid
+      my_density_c1d%in_space = density%in_space
+      my_density_c1d%array => density%cc
+      my_density_c1d%pw_grid => density%pw_grid
+      my_density_r3d%in_space = density%in_space
+      my_density_r3d%array => density%cr3d
+      my_density_r3d%pw_grid => density%pw_grid
+
       SELECT CASE (poisson_env%used_grid)
       CASE (use_gs_grid)
 
          SELECT CASE (poisson_env%green_fft%method)
          CASE (PERIODIC3D, ANALYTIC2D, ANALYTIC1D, ANALYTIC0D, MT2D, MT1D, MT0D, MULTIPOLE0D)
-            BLOCK
-               TYPE(pw_c1d_type) :: my_rhog, my_density_c1d
-               TYPE(pw_r3d_type) :: my_density_r3d
-               my_rhog%in_space = rhog%in_space
-               my_rhog%array => rhog%cc
-               my_rhog%pw_grid => rhog%pw_grid
-               my_density_c1d%in_space = density%in_space
-               my_density_c1d%array => density%cc
-               my_density_c1d%pw_grid => density%pw_grid
-               my_density_r3d%in_space = density%in_space
-               my_density_r3d%array => density%cr3d
-               my_density_r3d%pw_grid => density%pw_grid
-               IF (density%in_use == REALDATA3D) THEN
-                  CALL pw_transfer(my_density_r3d, my_rhog)
-               ELSE
-                  CALL pw_transfer(my_density_c1d, my_rhog)
-               END IF
-            END BLOCK
+            IF (density%in_use == REALDATA3D) THEN
+               CALL pw_transfer(my_density_r3d, my_rhog)
+            ELSE
+               CALL pw_transfer(my_density_c1d, my_rhog)
+            END IF
             IF (PRESENT(aux_density)) THEN
                CALL pw_transfer(aux_density, rhog_aux)
             END IF
             IF (PRESENT(ehartree) .AND. (.NOT. PRESENT(vhartree))) THEN
                CALL pw_pool%create_pw(tmpg, in_space=RECIPROCALSPACE)
-               CALL pw_copy(rhog, tmpg)
+               CALL pw_copy(my_rhog, tmpg)
             END IF
             IF (PRESENT(greenfn)) THEN
                influence_fn = greenfn
             ELSE
                influence_fn = poisson_env%green_fft%influence_fn
             END IF
-            CALL pw_multiply_with(rhog, influence_fn)
+            CALL pw_multiply_with(my_rhog, influence_fn)
             IF (PRESENT(aux_density)) THEN
                CALL pw_multiply_with(rhog_aux, influence_fn)
             END IF
@@ -1213,14 +1212,8 @@ CONTAINS
                   END IF
                END IF
             ELSE IF (PRESENT(ehartree)) THEN
-               BLOCK
-                  TYPE(pw_c1d_type) :: my_rhog
-                  my_rhog%in_space = rhog%in_space
-                  my_rhog%array => rhog%cc
-                  my_rhog%pw_grid => rhog%pw_grid
-                  ehartree = 0.5_dp*pw_integral_ab(my_rhog, tmpg)
-                  CALL pw_pool%give_back_pw(tmpg)
-               END BLOCK
+               ehartree = 0.5_dp*pw_integral_ab(my_rhog, tmpg)
+               CALL pw_pool%give_back_pw(tmpg)
             END IF
 
          CASE (PS_IMPLICIT)
