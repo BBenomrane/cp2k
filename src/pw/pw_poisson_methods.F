@@ -1141,9 +1141,9 @@ CONTAINS
       LOGICAL                                            :: has_dielectric
       TYPE(pw_grid_type), POINTER                        :: pw_grid
       TYPE(pw_pool_type), POINTER                        :: pw_pool
-      TYPE(pw_c1d_type) :: influence_fn
+      TYPE(pw_c1d_type) :: influence_fn, tmpg
       TYPE(pw_type)                                      ::  rhog, &
-                                                            rhog_aux, rhor, tmpg, vhartree_rs
+                                                            rhog_aux, rhor, vhartree_rs
 
       CALL timeset(routineN, handle)
 
@@ -1175,8 +1175,7 @@ CONTAINS
                CALL pw_transfer(aux_density, rhog_aux)
             END IF
             IF (PRESENT(ehartree) .AND. (.NOT. PRESENT(vhartree))) THEN
-               CALL pw_pool%create_pw(tmpg, use_data=COMPLEXDATA1D, &
-                                      in_space=RECIPROCALSPACE)
+               CALL pw_pool%create_pw(tmpg, in_space=RECIPROCALSPACE)
                CALL pw_copy(rhog, tmpg)
             END IF
             IF (PRESENT(greenfn)) THEN
@@ -1184,9 +1183,9 @@ CONTAINS
             ELSE
                influence_fn = poisson_env%green_fft%influence_fn
             END IF
-            rhog%cc(:) = rhog%cc(:)*influence_fn%array(:)
+            CALL pw_multiply_with(rhog, influence_fn)
             IF (PRESENT(aux_density)) THEN
-               rhog_aux%cc(:) = rhog_aux%cc(:)*influence_fn%array(:)
+               CALL pw_multiply_with(rhog_aux, influence_fn)
             END IF
             IF (PRESENT(vhartree)) THEN
                CALL pw_transfer(rhog, vhartree)
@@ -1198,8 +1197,14 @@ CONTAINS
                   END IF
                END IF
             ELSE IF (PRESENT(ehartree)) THEN
-               ehartree = 0.5_dp*pw_integral_ab(rhog, tmpg)
-               CALL pw_pool%give_back_pw(tmpg)
+               BLOCK
+                  TYPE(pw_c1d_type) :: my_rhog
+                  my_rhog%in_space = rhog%in_space
+                  my_rhog%array => rhog%cc
+                  my_rhog%pw_grid => rhog%pw_grid
+                  ehartree = 0.5_dp*pw_integral_ab(my_rhog, tmpg)
+                  CALL pw_pool%give_back_pw(tmpg)
+               END BLOCK
             END IF
 
          CASE (PS_IMPLICIT)
