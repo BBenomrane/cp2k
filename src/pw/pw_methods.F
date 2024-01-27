@@ -4801,82 +4801,32 @@ CONTAINS
                            LOGICAL, INTENT(IN), OPTIONAL                      :: just_sum, local_only
                            REAL(KIND=dp)                                      :: integral_value
 
-                           CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_integral_ab'
-
-                           INTEGER                                            :: handle, loc_sumtype
-                           LOGICAL                                            :: my_just_sum, my_local_only
-
-                           CALL timeset(routineN, handle)
-
-                           loc_sumtype = do_accurate_sum
-                           IF (PRESENT(sumtype)) loc_sumtype = sumtype
-
-                           my_local_only = .FALSE.
-                           IF (PRESENT(local_only)) my_local_only = local_only
-
-                           IF (.NOT. ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
-                              CPABORT("Grids incompatible")
-                           END IF
-
-                           my_just_sum = .FALSE.
-                           IF (PRESENT(just_sum)) my_just_sum = just_sum
-
-                           ! do standard sum
-                           IF (loc_sumtype == do_standard_sum) THEN
-
-                              ! Do standard sum
-
-                              ! since the return value is real, only do accurate sum on the real bit ?
-                              IF (pw1%in_use == REALDATA3D .AND. pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, integral_value)
-                                 integral_value = SUM(pw1%cr3d(:, :, :) &
-                                                      *pw2%cr3d(:, :, :))
-!$OMP END PARALLEL WORKSHARE
-                              ELSE IF (pw1%in_use == COMPLEXDATA1D &
-                                       .AND. pw2%in_use == COMPLEXDATA1D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, integral_value)
-                                 integral_value = REAL(DOT_PRODUCT(CONJG(pw1%cc(:)), CONJG(pw2%cc(:))), KIND=dp) !? complex bit
-!$OMP END PARALLEL WORKSHARE
-                              ELSE
-                                 CPABORT("No possible DATA")
-                              END IF
-
+                           IF (pw1%in_use == REALDATA3D) THEN
+                              BLOCK
+                                 TYPE(pw_r3d_type) :: pw1_r3d, pw2_r3d
+                                 pw1_r3d%in_space = pw1%in_space
+                                 pw1_r3d%pw_grid => pw1%pw_grid
+                                 pw1_r3d%array => pw1%cr3d
+                                 pw2_r3d%in_space = pw2%in_space
+                                 pw2_r3d%pw_grid => pw2%pw_grid
+                                 pw2_r3d%array => pw2%cr3d
+                                 integral_value = pw_integral_ab(pw1_r3d, pw2_r3d, sumtype, just_sum, local_only)
+                                 RETURN
+                              END BLOCK
                            ELSE
-
-                              ! Do accurate sum
-
-                              ! since the return value is real, only do accurate sum on the real bit ?
-                              IF (pw1%in_use == REALDATA3D .AND. pw2%in_use == REALDATA3D) THEN
-                                 integral_value = accurate_dot_product(pw1%cr3d(:, :, :), &
-                                                                       pw2%cr3d(:, :, :))
-                              ELSE IF (pw1%in_use == COMPLEXDATA1D &
-                                       .AND. pw2%in_use == COMPLEXDATA1D) THEN
-                                 integral_value = REAL(accurate_sum(CONJG(pw1%cc(:))*pw2%cc(:)), KIND=dp) !? complex bit
-                              ELSE
-                                 CPABORT("No possible DATA")
-                              END IF
-
+                              BLOCK
+                                 TYPE(pw_c1d_type) :: pw1_c1d, pw2_c1d
+                                 pw1_c1d%in_space = pw1%in_space
+                                 pw1_c1d%pw_grid => pw1%pw_grid
+                                 pw1_c1d%array => pw1%cc
+                                 pw2_c1d%in_space = pw2%in_space
+                                 pw2_c1d%pw_grid => pw2%pw_grid
+                                 pw2_c1d%array => pw2%cc
+                                 integral_value = pw_integral_ab(pw1_c1d, pw2_c1d, sumtype, just_sum, local_only)
+                                 RETURN
+                              END BLOCK
                            END IF
-
-                           IF (.NOT. my_just_sum) THEN
-                              IF (pw1%in_use == REALDATA3D) THEN
-                                 integral_value = integral_value*pw1%pw_grid%dvol
-                              ELSE
-                                 integral_value = integral_value*pw1%pw_grid%vol
-                              END IF
-                           END IF
-
-                           IF (pw1%in_use == COMPLEXDATA1D) THEN
-                              IF (pw1%pw_grid%grid_span == HALFSPACE) THEN
-                                 integral_value = 2.0_dp*integral_value
-                                 IF (pw1%pw_grid%have_g0) integral_value = integral_value - &
-                                                                           REAL(CONJG(pw1%cc(1))*pw2%cc(1), KIND=dp)
-                              END IF
-                           END IF
-
-                           IF (.NOT. my_local_only .AND. pw1%pw_grid%para%mode == PW_MODE_DISTRIBUTED) &
-                              CALL pw1%pw_grid%para%group%sum(integral_value)
-                           CALL timestop(handle)
+                           CPABORT("")
 
                         END FUNCTION pw_integral_ab_pw
 
@@ -4982,51 +4932,26 @@ CONTAINS
                            CHARACTER(len=*), INTENT(IN), OPTIONAL             :: oprt
                            REAL(KIND=dp)                                      :: total_fun
 
-                           INTEGER                                            :: iop
-
-                           iop = 0
-
-                           IF (PRESENT(oprt)) THEN
-                              SELECT CASE (oprt)
-                              CASE ("ABS", "abs")
-                                 iop = 1
-                              CASE DEFAULT
-                                 CPABORT("Unknown operator")
-                              END SELECT
-                           END IF
-
-                           total_fun = 0.0_dp
-
-                           IF (fun%in_space == REALSPACE) THEN
-                              IF (fun%in_use == REALDATA3D) THEN
-                                 ! do reduction using maximum accuracy
-                                 IF (iop == 1) THEN
-                                    total_fun = fun%pw_grid%dvol*accurate_sum(ABS(fun%cr3d))
-                                 ELSE
-                                    total_fun = fun%pw_grid%dvol*accurate_sum(fun%cr3d)
-                                 END IF
-                              ELSE
-                                 CPABORT("In_space/in_use combination not implemented")
-                              END IF
-                           ELSE IF (fun%in_space == RECIPROCALSPACE) THEN
-                              IF (iop == 1) &
-                                 CPABORT("Operator ABS not implemented")
-                              IF (fun%in_use == COMPLEXDATA1D) THEN
-                                 IF (fun%pw_grid%have_g0) total_fun = REAL(fun%pw_grid%vol*fun%cc(1), KIND=dp)
-                              ELSE
-                                 CPABORT("In_space/in_use combination not implemented")
-                              END IF
+                           IF (fun%in_use == REALDATA3D) THEN
+                              BLOCK
+                                 TYPE(pw_r3d_type) :: fun_r3d
+                                 fun_r3d%in_space = fun%in_space
+                                 fun_r3d%pw_grid => fun%pw_grid
+                                 fun_r3d%array => fun%cr3d
+                                 total_fun = pw_integrate_function_r3d(fun_r3d, isign, oprt)
+                                 RETURN
+                              END BLOCK
                            ELSE
-                              CPABORT("No space defined")
+                              BLOCK
+                                 TYPE(pw_c1d_type) :: fun_c1d
+                                 fun_c1d%in_space = fun%in_space
+                                 fun_c1d%pw_grid => fun%pw_grid
+                                 fun_c1d%array => fun%cc
+                                 total_fun = pw_integrate_function_c1d(fun_c1d, isign, oprt)
+                                 RETURN
+                              END BLOCK
                            END IF
-
-                           IF (fun%pw_grid%para%mode /= PW_MODE_LOCAL) THEN
-                              CALL fun%pw_grid%para%group%sum(total_fun)
-                           END IF
-
-                           IF (PRESENT(isign)) THEN
-                              total_fun = total_fun*SIGN(1._dp, REAL(isign, dp))
-                           END IF
+                           CPABORT("")
 
                         END FUNCTION pw_integrate_function_pw
 
