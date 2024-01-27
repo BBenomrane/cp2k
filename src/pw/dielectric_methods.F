@@ -51,8 +51,6 @@ MODULE dielectric_methods
    PUBLIC :: dielectric_create, dielectric_compute, derive_fft
 
    INTERFACE dielectric_compute
-      MODULE PROCEDURE dielectric_compute_periodic_pw, &
-         dielectric_compute_neumann_pw
       MODULE PROCEDURE dielectric_compute_periodic_r3d, &
          dielectric_compute_neumann_r3d
       MODULE PROCEDURE dielectric_compute_periodic_c1d, &
@@ -272,49 +270,6 @@ CONTAINS
       END SUBROUTINE dielectric_compute_periodic_${kind}$
    #:endfor
 
-! **************************************************************************************************
-!> \brief   evaluates the dielectric constant
-!> \param dielectric  the dielectric data type to be initialized
-!> \param diel_rs_grid real space grid for finite difference derivative
-!> \param pw_pool pool of plane wave grid
-!> \param rho electronic density
-!> \param rho_core core density
-!> \par History
-!>       06.2014 created [Hossein Bani-Hashemian]
-!>       12.2014 added finite difference derivatives [Hossein Bani-Hashemian]
-!>       07.2015 density-independent dielectric regions [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE dielectric_compute_periodic_pw(dielectric, diel_rs_grid, pw_pool, rho, rho_core)
-
-      TYPE(dielectric_type), INTENT(INOUT), POINTER      :: dielectric
-      TYPE(realspace_grid_type), POINTER                 :: diel_rs_grid
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(pw_type), INTENT(IN)                          :: rho
-      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL                :: rho_core
-
-      IF (rho%in_use == REALDATA3D) THEN
-         BLOCK
-            TYPE(pw_r3d_type) :: my_rho
-
-            my_rho%pw_grid => rho%pw_grid
-            my_rho%array => rho%cr3d
-            my_rho%in_space = rho%in_space
-            CALL dielectric_compute_periodic_r3d(dielectric, diel_rs_grid, pw_pool, my_rho, rho_core)
-         END BLOCK
-      ELSE
-         BLOCK
-            TYPE(pw_c1d_type) :: my_rho
-
-            my_rho%pw_grid => rho%pw_grid
-            my_rho%array => rho%cc
-            my_rho%in_space = rho%in_space
-            CALL dielectric_compute_periodic_c1d(dielectric, diel_rs_grid, pw_pool, my_rho, rho_core)
-         END BLOCK
-      END IF
-
-   END SUBROUTINE dielectric_compute_periodic_pw
-
    #:for kind in ["c1d", "r3d"]
 ! **************************************************************************************************
 !> \brief   evaluates the dielectric constant for non-periodic (Neumann-type)
@@ -511,67 +466,6 @@ CONTAINS
 
       END SUBROUTINE dielectric_compute_neumann_${kind}$
    #:endfor
-
-! **************************************************************************************************
-!> \brief   evaluates the dielectric constant for non-periodic (Neumann-type)
-!>          boundaries
-!> \param dielectric  the dielectric data type to be initialized
-!> \param diel_rs_grid real space grid for finite difference derivative
-!> \param pw_pool_orig pool of plane wave grid
-!> \param dct_pw_grid ...
-!> \param neumann_directions ...
-!> \param recv_msgs_bnds bounds of the messages to be received (pw_expand)
-!> \param dests_expand list of the destination processes (pw_expand)
-!> \param srcs_expand list of the source processes (pw_expand)
-!> \param flipg_stat flipping status for the received data chunks (pw_expand)
-!> \param bounds_shftd bounds of the original grid shifted to have g0 in the
-!>        middle of the cell (pw_expand)
-!> \param rho electronic density
-!> \param rho_core core density
-!> \par History
-!>       11.2015 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE dielectric_compute_neumann_pw(dielectric, diel_rs_grid, pw_pool_orig, &
-                                            dct_pw_grid, neumann_directions, recv_msgs_bnds, &
-                                            dests_expand, srcs_expand, flipg_stat, bounds_shftd, rho, rho_core)
-
-      TYPE(dielectric_type), INTENT(INOUT), POINTER      :: dielectric
-      TYPE(realspace_grid_type), POINTER                 :: diel_rs_grid
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool_orig
-      TYPE(pw_grid_type), INTENT(IN), POINTER            :: dct_pw_grid
-      INTEGER, INTENT(IN)                                :: neumann_directions
-      INTEGER, DIMENSION(:, :, :), INTENT(IN), POINTER   :: recv_msgs_bnds
-      INTEGER, DIMENSION(:), INTENT(IN), POINTER         :: dests_expand, srcs_expand, flipg_stat
-      INTEGER, DIMENSION(2, 3), INTENT(IN)               :: bounds_shftd
-      TYPE(pw_type), INTENT(IN)                          :: rho
-      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL                :: rho_core
-
-      IF (rho%in_use == REALDATA3D) THEN
-         BLOCK
-            TYPE(pw_r3d_type) :: my_rho
-
-            my_rho%pw_grid => rho%pw_grid
-            my_rho%array => rho%cr3d
-            my_rho%in_space = rho%in_space
-            CALL dielectric_compute_neumann_r3d(dielectric, diel_rs_grid, pw_pool_orig, &
-                                                dct_pw_grid, neumann_directions, recv_msgs_bnds, &
-                                                dests_expand, srcs_expand, flipg_stat, bounds_shftd, my_rho, rho_core)
-         END BLOCK
-      ELSE
-         BLOCK
-            TYPE(pw_c1d_type) :: my_rho
-
-            my_rho%pw_grid => rho%pw_grid
-            my_rho%array => rho%cc
-            my_rho%in_space = rho%in_space
-            CALL dielectric_compute_neumann_c1d(dielectric, diel_rs_grid, pw_pool_orig, &
-                                                dct_pw_grid, neumann_directions, recv_msgs_bnds, &
-                                                dests_expand, srcs_expand, flipg_stat, bounds_shftd, my_rho, rho_core)
-         END BLOCK
-      END IF
-
-   END SUBROUTINE dielectric_compute_neumann_pw
 
 ! **************************************************************************************************
 !> \brief  calculates the dielectric constant as a function of the electronic density
