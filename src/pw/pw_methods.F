@@ -404,10 +404,8 @@ CONTAINS
          TYPE(pw_type), INTENT(INOUT)                       :: pw2
          LOGICAL, INTENT(IN), OPTIONAL                      :: debug
 
-         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_transfer'
-
-         INTEGER                                            :: handle
          TYPE(pw_r3d_type) :: pw2_r3d
+         TYPE(pw_c1d_type) :: pw2_c1d
 
          IF (pw2%in_use == REALDATA3D) THEN
             pw2_r3d%in_space = pw2%in_space
@@ -416,50 +414,14 @@ CONTAINS
             CALL pw_transfer_${kind}$_r3d(pw1, pw2_r3d, debug)
             RETURN
          END IF
-
-         CALL timeset(routineN, handle)
-         !sample peak memory
-         CALL m_memory()
-
-         IF (pw1%in_space == REALSPACE .AND. pw2%in_space == REALSPACE) THEN
-
-            ! simple copy should do
-            CALL pw_copy(pw1, pw2)
-
-         ELSE IF (pw1%in_space == RECIPROCALSPACE .AND. &
-                  pw2%in_space == RECIPROCALSPACE) THEN
-
-            IF (.FALSE.) THEN
-               #:if kind[1]=="1"
-                  ELSE IF (COMPLEXDATA1D == pw2%in_use) THEN
-               #:else
-                  ELSE IF (REALDATA3D == pw2%in_use) THEN
-               #:endif
-
-               ! simple copy should do
-               CALL pw_copy(pw1, pw2)
-
-            ELSE
-
-               IF (.FALSE.) THEN
-                  #:if kind=="c3d"
-                     ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
-                     CALL pw_gather(pw2, pw1%array)
-                  #:endif
-               ELSE
-                  CPABORT("Do not know what to do")
-               END IF
-
-            END IF
-
-         ELSE
-
-            ! FFT needed, all further tests done in fft_wrap_pw1pw2
-            CALL fft_wrap_pw1pw2_${kind}$_pw(pw1, pw2, debug)
-
+         IF (pw2%in_use == COMPLEXDATA1D) THEN
+            pw2_c1d%in_space = pw2%in_space
+            pw2_c1d%pw_grid => pw2%pw_grid
+            pw2_c1d%array => pw2%cc
+            CALL pw_transfer_${kind}$_c1d(pw1, pw2_c1d, debug)
+            RETURN
          END IF
-
-         CALL timestop(handle)
+         CPABORT("")
 
       END SUBROUTINE pw_transfer_${kind}$_pw
 
@@ -480,10 +442,8 @@ CONTAINS
          TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw2
          LOGICAL, INTENT(IN), OPTIONAL                      :: debug
 
-         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_transfer'
-
-         INTEGER                                            :: handle
          TYPE(pw_r3d_type) :: pw1_r3d
+         TYPE(pw_c1d_type) :: pw1_c1d
 
          IF (pw1%in_use == REALDATA3D) THEN
             pw1_r3d%in_space = pw1%in_space
@@ -492,51 +452,14 @@ CONTAINS
             CALL pw_transfer_r3d_${kind}$ (pw1_r3d, pw2, debug)
             RETURN
          END IF
-
-         CALL timeset(routineN, handle)
-         !sample peak memory
-         CALL m_memory()
-
-         IF (pw1%in_space == REALSPACE .AND. pw2%in_space == REALSPACE) THEN
-
-            ! simple copy should do
-            CALL pw_copy(pw1, pw2)
-
-         ELSE IF (pw1%in_space == RECIPROCALSPACE .AND. &
-                  pw2%in_space == RECIPROCALSPACE) THEN
-
-            IF (.FALSE.) THEN
-               #:if kind=="c1d"
-                  ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-               #:elif kind=="r3d"
-                  ELSE IF (pw1%in_use == REALDATA3D) THEN
-               #:endif
-
-               ! simple copy should do
-               CALL pw_copy(pw1, pw2)
-
-            ELSE
-
-               IF (.FALSE.) THEN
-                  #:if kind=="c3d"
-                     ! we have to gather/scatter the data
-                     ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-                     CALL pw_scatter(pw1, pw2%array)
-                  #:endif
-               ELSE
-                  CPABORT("Do not know what to do")
-               END IF
-
-            END IF
-
-         ELSE
-
-            ! FFT needed, all further tests done in fft_wrap_pw1pw2
-            CALL fft_wrap_pw1pw2_pw_${kind}$ (pw1, pw2, debug)
-
+         IF (pw1%in_use == COMPLEXDATA1D) THEN
+            pw1_c1d%in_space = pw1%in_space
+            pw1_c1d%pw_grid => pw1%pw_grid
+            pw1_c1d%array => pw1%cc
+            CALL pw_transfer_c1d_${kind}$ (pw1_c1d, pw2, debug)
+            RETURN
          END IF
-
-         CALL timestop(handle)
+         CPABORT("")
 
       END SUBROUTINE pw_transfer_pw_${kind}$
 
@@ -3946,10 +3869,8 @@ CONTAINS
                            TYPE(pw_type), INTENT(INOUT)                       :: pw2
                            LOGICAL, INTENT(IN), OPTIONAL                      :: debug
 
-                           CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_transfer'
-
-                           INTEGER                                            :: handle
                            TYPE(pw_r3d_type) :: pw1_r3d
+                           TYPE(pw_c1d_type) :: pw1_c1d
 
                            IF (pw1%in_use == REALDATA3D) THEN
                               pw1_r3d%in_space = pw1%in_space
@@ -3958,40 +3879,14 @@ CONTAINS
                               CALL pw_transfer(pw1_r3d, pw2, debug)
                               RETURN
                            END IF
-
-                           CALL timeset(routineN, handle)
-                           !sample peak memory
-                           CALL m_memory()
-
-                           IF (pw1%in_space == RECIPROCALSPACE .AND. &
-                               pw2%in_space == RECIPROCALSPACE) THEN
-
-                              IF (pw1%in_use == pw2%in_use) THEN
-
-                                 ! simple copy should do
-                                 CALL pw_copy(pw1, pw2)
-
-                              ELSE
-
-                                 ! we have to gather/scatter the data
-                                 IF (pw1%in_use == COMPLEXDATA1D) THEN
-                                    CALL pw_scatter(pw1, pw2%cc3d)
-                                 ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
-                                    CALL pw_gather(pw2, pw1%cc3d)
-                                 ELSE
-                                    CPABORT("Do not know what to do")
-                                 END IF
-
-                              END IF
-
-                           ELSE
-
-                              ! FFT needed, all further tests done in fft_wrap_pw1pw2
-                              CALL fft_wrap_pw1pw2_pw_pw(pw1, pw2, debug)
-
+                           IF (pw1%in_use == COMPLEXDATA1D) THEN
+                              pw1_c1d%in_space = pw1%in_space
+                              pw1_c1d%pw_grid => pw1%pw_grid
+                              pw1_c1d%array => pw1%cc
+                              CALL pw_transfer(pw1_c1d, pw2, debug)
+                              RETURN
                            END IF
-
-                           CALL timestop(handle)
+                           CPABORT("")
 
                         END SUBROUTINE pw_transfer_pw_pw
 
