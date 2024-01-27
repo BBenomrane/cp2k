@@ -1594,38 +1594,30 @@ CONTAINS
          TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw1
          TYPE(pw_type), INTENT(IN)                          :: pw2
 
-         CHARACTER(LEN=*), PARAMETER                        :: routineN = 'pw_multiply_with'
+         #:if kind[1]=="3"
+            TYPE(pw_r3d_type) :: pw2_r3d
 
-         INTEGER                                            :: handle
+            IF (pw2%in_use == REALDATA3D) THEN
+               pw2_r3d%in_space = pw2%in_space
+               pw2_r3d%pw_grid => pw2%pw_grid
+               pw2_r3d%array => pw2%cr3d
+               CALL pw_multiply_with_${kind}$_r3d(pw1, pw2_r3d)
+               RETURN
+            END IF
+         #:endif
 
-         CALL timeset(routineN, handle)
+         #:if kind[1]=="1"
+            TYPE(pw_c1d_type) :: pw2_c1d
 
-         IF (pw1%in_space /= pw2%in_space) &
-            CPABORT("Invalid space combination!")
-         IF (.NOT. pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
-            CPABORT("Incompatible grids!")
-
-         IF (.FALSE.) THEN
-            #:if kind=="r3d"
-               ELSE IF (pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-               pw1%array = pw1%array*pw2%cr3d
-!$OMP END PARALLEL WORKSHARE
-            #:elif kind=="c1d"
-               ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-               pw1%array = pw1%array*pw2%cc
-!$OMP END PARALLEL WORKSHARE
-            #:elif kind=="c3d"
-               ELSE IF (pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-               pw1%array = pw1%array*pw2%cr3d
-!$OMP END PARALLEL WORKSHARE
-            #:endif
-         ELSE
-            CPABORT("Invalid combination of grids!")
-         END IF
-         CALL timestop(handle)
+            IF (pw2%in_use == COMPLEXDATA1D) THEN
+               pw2_c1d%in_space = pw2%in_space
+               pw2_c1d%pw_grid => pw2%pw_grid
+               pw2_c1d%array => pw2%cc
+               CALL pw_multiply_with_${kind}$_c1d(pw1, pw2_c1d)
+               RETURN
+            END IF
+         #:endif
+         CPABORT("")
 
       END SUBROUTINE pw_multiply_with_${kind}$_pw
 
@@ -1633,38 +1625,30 @@ CONTAINS
          TYPE(pw_type), INTENT(INOUT)                       :: pw1
          TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw2
 
-         CHARACTER(LEN=*), PARAMETER                        :: routineN = 'pw_multiply_with'
+         #:if kind[1]=="3"
+            TYPE(pw_r3d_type) :: pw1_r3d
 
-         INTEGER                                            :: handle
+            IF (pw1%in_use == REALDATA3D) THEN
+               pw1_r3d%in_space = pw1%in_space
+               pw1_r3d%pw_grid => pw1%pw_grid
+               pw1_r3d%array => pw1%cr3d
+               CALL pw_multiply_with_r3d_${kind}$ (pw1_r3d, pw2)
+               RETURN
+            END IF
+         #:endif
 
-         CALL timeset(routineN, handle)
+         #:if kind[1]=="1"
+            TYPE(pw_c1d_type) :: pw1_c1d
 
-         IF (pw1%in_space /= pw2%in_space) &
-            CPABORT("Invalid space combination!")
-         IF (.NOT. pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
-            CPABORT("Incompatible grids!")
-
-         IF (.FALSE.) THEN
-            #:if kind=="r1d"
-               ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-               pw1%cc = pw1%cc*pw2%array
-!$OMP END PARALLEL WORKSHARE
-            #:elif kind=="r3d"
-               ELSE IF (pw1%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-               pw1%cr3d = pw1%cr3d*pw2%array
-!$OMP END PARALLEL WORKSHARE
-            #:elif kind=="c1d"
-               ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-               pw1%cc = pw1%cc*pw2%array
-!$OMP END PARALLEL WORKSHARE
-            #:endif
-         ELSE
-            CPABORT("Invalid combination of grids!")
-         END IF
-         CALL timestop(handle)
+            IF (pw1%in_use == COMPLEXDATA1D) THEN
+               pw1_c1d%in_space = pw1%in_space
+               pw1_c1d%pw_grid => pw1%pw_grid
+               pw1_c1d%array => pw1%cc
+               CALL pw_multiply_with_c1d_${kind}$ (pw1_c1d, pw2)
+               RETURN
+            END IF
+         #:endif
+         CPABORT("")
 
       END SUBROUTINE pw_multiply_with_pw_${kind}$
    #:endfor
@@ -4990,29 +4974,26 @@ CONTAINS
                            TYPE(pw_type), INTENT(INOUT)                       :: pw1
                            TYPE(pw_type), INTENT(IN)                          :: pw2
 
-                           CHARACTER(LEN=*), PARAMETER                        :: routineN = 'pw_multiply_with'
-
-                           INTEGER                                            :: handle
-
-                           CALL timeset(routineN, handle)
-
-                           IF (pw1%in_space /= pw2%in_space) &
-                              CPABORT("Invalid space combination!")
-                           IF (.NOT. pw_compatible(pw1%pw_grid, pw2%pw_grid)) &
-                              CPABORT("Incompatible grids!")
-
-                           IF (pw1%in_use == REALDATA3D .AND. pw2%in_use == REALDATA3D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                              pw1%cr3d = pw1%cr3d*pw2%cr3d
-!$OMP END PARALLEL WORKSHARE
-                           ELSE IF (pw1%in_use == COMPLEXDATA1D .AND. pw2%in_use == COMPLEXDATA1D) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                              pw1%cc = pw1%cc*pw2%cc
-!$OMP END PARALLEL WORKSHARE
-                           ELSE
-                              CPABORT("Invalid combination of grids!")
+                           IF (pw2%in_use == REALDATA3D) THEN
+                              BLOCK
+                                 TYPE(pw_r3d_type) :: pw1_r3d
+                                 pw1_r3d%in_space = pw1%in_space
+                                 pw1_r3d%pw_grid => pw1%pw_grid
+                                 pw1_r3d%array => pw1%cr3d
+                                 CALL pw_multiply_with_r3d_pw(pw1_r3d, pw2)
+                                 RETURN
+                              END BLOCK
+                           ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
+                              BLOCK
+                                 TYPE(pw_c1d_type) :: pw1_c1d
+                                 pw1_c1d%in_space = pw1%in_space
+                                 pw1_c1d%pw_grid => pw1%pw_grid
+                                 pw1_c1d%array => pw1%cc
+                                 CALL pw_multiply_with_c1d_pw(pw1_c1d, pw2)
+                                 RETURN
+                              END BLOCK
                            END IF
-                           CALL timestop(handle)
+                           CPABORT("")
 
                         END SUBROUTINE pw_multiply_with_pw_pw
 
