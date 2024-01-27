@@ -331,6 +331,20 @@ CONTAINS
             END IF
          #:endif
 
+         #:if kind[1]=="1"
+            TYPE(pw_c1d_type) :: pw2_c1d
+
+            IF (pw2%in_use == COMPLEXDATA1D) THEN
+               pw2_c1d%in_space = pw2%in_space
+               pw2_c1d%pw_grid => pw2%pw_grid
+               pw2_c1d%array => pw2%cc
+               CALL pw_axpy_${kind}$_c1d(pw1, pw2_c1d, alpha, beta, allow_noncompatible_grids)
+               RETURN
+            ELSE
+               CPABORT("")
+            END IF
+         #:endif
+
          CALL timeset(routineN, handle)
 
          out_unit = cp_logger_get_default_io_unit()
@@ -541,6 +555,20 @@ CONTAINS
                pw1_r3d%pw_grid => pw1%pw_grid
                pw1_r3d%array => pw1%cr3d
                CALL pw_axpy_r3d_${kind}$ (pw1_r3d, pw2, alpha, beta, allow_noncompatible_grids)
+               RETURN
+            ELSE
+               CPABORT("")
+            END IF
+         #:endif
+
+         #:if kind[1]=="1"
+            TYPE(pw_c1d_type) :: pw1_c1d
+
+            IF (pw1%in_use == COMPLEXDATA1D) THEN
+               pw1_c1d%in_space = pw1%in_space
+               pw1_c1d%pw_grid => pw1%pw_grid
+               pw1_c1d%array => pw1%cc
+               CALL pw_axpy_c1d_${kind}$ (pw1_c1d, pw2, alpha, beta, allow_noncompatible_grids)
                RETURN
             ELSE
                CPABORT("")
@@ -2311,36 +2339,72 @@ CONTAINS
                   END IF
 
                ELSE IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
-                  IF (my_alpha == 1.0_dp) THEN
+                  IF (ng1 >= ng2) THEN
+                     IF (my_alpha == 1.0_dp) THEN
 !$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng, pw1, pw2)
-                     DO i = 1, ng
-                        j = pw2%pw_grid%gidx(i)
-                        pw2%array(i) = pw2%array(i) + ${type2type("pw1%array(j)", kind, kind2)}$
-                     END DO
+                        DO i = 1, ng
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%array(i) = pw2%array(i) + ${type2type("pw1%array(j)", kind, kind2)}$
+                        END DO
 !$OMP END PARALLEL DO
-                  ELSE IF (my_alpha /= 0.0_dp) THEN
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
 !$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng, pw1, pw2)
-                     DO i = 1, ng
-                        j = pw2%pw_grid%gidx(i)
-                        pw2%array(i) = pw2%array(i) + my_alpha*${type2type("pw1%array(j)", kind, kind2)}$
-                     END DO
+                        DO i = 1, ng
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%array(i) = pw2%array(i) + my_alpha*${type2type("pw1%array(j)", kind, kind2)}$
+                        END DO
 !$OMP END PARALLEL DO
+                     END IF
+                  ELSE
+                     IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng, pw1, pw2)
+                        DO i = 1, ng
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%array(j) = pw2%array(j) + ${type2type("pw1%array(i)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng, pw1, pw2)
+                        DO i = 1, ng
+                           j = pw2%pw_grid%gidx(i)
+                           pw2%array(j) = pw2%array(j) + my_alpha*${type2type("pw1%array(i)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
                   END IF
                ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
-                  IF (my_alpha == 1.0_dp) THEN
+                  IF (ng1 >= ng2) THEN
+                     IF (my_alpha == 1.0_dp) THEN
 !$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng, pw1, pw2)
-                     DO i = 1, ng
-                        j = pw1%pw_grid%gidx(i)
-                        pw2%array(i) = pw2%array(i) + ${type2type("pw1%array(j)", kind, kind2)}$
-                     END DO
+                        DO i = 1, ng
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%array(i) = pw2%array(i) + ${type2type("pw1%array(j)", kind, kind2)}$
+                        END DO
 !$OMP END PARALLEL DO
-                  ELSE IF (my_alpha /= 0.0_dp) THEN
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
 !$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng, pw1, pw2)
-                     DO i = 1, ng
-                        j = pw1%pw_grid%gidx(i)
-                        pw2%array(i) = pw2%array(i) + my_alpha*${type2type("pw1%array(j)", kind, kind2)}$
-                     END DO
+                        DO i = 1, ng
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%array(i) = pw2%array(i) + my_alpha*${type2type("pw1%array(j)", kind, kind2)}$
+                        END DO
 !$OMP END PARALLEL DO
+                     END IF
+                  ELSE
+                     IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng, pw1, pw2)
+                        DO i = 1, ng
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%array(j) = pw2%array(j) + ${type2type("pw1%array(i)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng, pw1, pw2)
+                        DO i = 1, ng
+                           j = pw1%pw_grid%gidx(i)
+                           pw2%array(j) = pw2%array(j) + my_alpha*${type2type("pw1%array(i)", kind, kind2)}$
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
                   END IF
                ELSE
                   CPABORT("Grids not compatible")
