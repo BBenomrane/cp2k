@@ -1267,7 +1267,7 @@ CONTAINS
             TYPE(pw_grid_type), POINTER                        :: pw_grid
             TYPE(pw_pool_type), POINTER                        :: pw_pool
             TYPE(pw_c1d_type) :: influence_fn, tmpg
-            TYPE(pw_type)                                      ::  rhor, vhartree_rs
+            TYPE(pw_r3d_type)                                      ::  rhor, vhartree_rs
             TYPE(pw_c1d_type) :: rhog, rhog_aux
 
             CALL timeset(routineN, handle)
@@ -1347,8 +1347,8 @@ CONTAINS
                      END SELECT
                   END IF
 
-                  CALL pw_pool%create_pw(rhor, use_data=REALDATA3D, in_space=REALSPACE)
-                  CALL pw_pool%create_pw(vhartree_rs, use_data=REALDATA3D, in_space=REALSPACE)
+                  CALL pw_pool%create_pw(rhor, in_space=REALSPACE)
+                  CALL pw_pool%create_pw(vhartree_rs, in_space=REALSPACE)
                   CALL pw_transfer(density, rhor)
 
                   SELECT CASE (poisson_env%parameters%ps_implicit_params%boundary_condition)
@@ -1382,24 +1382,27 @@ CONTAINS
                END SELECT
 
             CASE (use_rs_grid)
+               BLOCK
+                  TYPE(pw_type) :: my_rhor
 
-               CALL pw_pool%create_pw(rhor, use_data=REALDATA3D, in_space=REALSPACE)
-               CALL pw_transfer(density, rhor)
-               CALL cp2k_distribution_to_z_slices(rhor, poisson_env%wavelet, rhor%pw_grid)
-               CALL ps_wavelet_solve(poisson_env%wavelet, rhor%pw_grid)
-               CALL z_slices_to_cp2k_distribution(rhor, poisson_env%wavelet, rhor%pw_grid)
-               CALL pw_transfer(rhor, vhartree)
-               IF (PRESENT(ehartree)) THEN
-                  #:if kindd == kindv
-                     ehartree = 0.5_dp*pw_integral_ab(density, vhartree)
-                  #:else
-                     CPABORT("")
-                  #:endif
-               END IF
-               IF (PRESENT(h_stress) .OR. PRESENT(dvhartree)) THEN
-                  CALL pw_transfer(rhor, rhog)
-               END IF
-               CALL pw_pool%give_back_pw(rhor)
+                  CALL pw_pool%create_pw(my_rhor, use_data=REALDATA3D, in_space=REALSPACE)
+                  CALL pw_transfer(density, my_rhor)
+                  CALL cp2k_distribution_to_z_slices(my_rhor, poisson_env%wavelet, my_rhor%pw_grid)
+                  CALL ps_wavelet_solve(poisson_env%wavelet, my_rhor%pw_grid)
+                  CALL z_slices_to_cp2k_distribution(my_rhor, poisson_env%wavelet, my_rhor%pw_grid)
+                  CALL pw_transfer(my_rhor, vhartree)
+                  IF (PRESENT(ehartree)) THEN
+                     #:if kindd == kindv
+                        ehartree = 0.5_dp*pw_integral_ab(density, vhartree)
+                     #:else
+                        CPABORT("")
+                     #:endif
+                  END IF
+                  IF (PRESENT(h_stress) .OR. PRESENT(dvhartree)) THEN
+                     CALL pw_transfer(my_rhor, rhog)
+                  END IF
+                  CALL pw_pool%give_back_pw(my_rhor)
+               END BLOCK
 
             END SELECT
 
