@@ -407,6 +407,15 @@ CONTAINS
          CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_transfer'
 
          INTEGER                                            :: handle
+         TYPE(pw_r3d_type) :: pw2_r3d
+
+         IF (pw2%in_use == REALDATA3D) THEN
+            pw2_r3d%in_space = pw2%in_space
+            pw2_r3d%pw_grid => pw2%pw_grid
+            pw2_r3d%array => pw2%cr3d
+            CALL pw_transfer_${kind}$_r3d(pw1, pw2_r3d, debug)
+            RETURN
+         END IF
 
          CALL timeset(routineN, handle)
          !sample peak memory
@@ -474,6 +483,15 @@ CONTAINS
          CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_transfer'
 
          INTEGER                                            :: handle
+         TYPE(pw_r3d_type) :: pw1_r3d
+
+         IF (pw1%in_use == REALDATA3D) THEN
+            pw1_r3d%in_space = pw1%in_space
+            pw1_r3d%pw_grid => pw1%pw_grid
+            pw1_r3d%array => pw1%cr3d
+            CALL pw_transfer_r3d_${kind}$ (pw1_r3d, pw2, debug)
+            RETURN
+         END IF
 
          CALL timeset(routineN, handle)
          !sample peak memory
