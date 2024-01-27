@@ -54,8 +54,7 @@ MODULE ps_implicit_methods
                                               REALSPACE,&
                                               RECIPROCALSPACE,&
                                               pw_c1d_type,&
-                                              pw_r3d_type,&
-                                              pw_type
+                                              pw_r3d_type
 #include "../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -72,22 +71,6 @@ MODULE ps_implicit_methods
       MODULE PROCEDURE compute_ehartree_periodic_bc, &
          compute_ehartree_mixed_bc
    END INTERFACE ps_implicit_compute_ehartree
-
-   INTERFACE implicit_poisson_solver_periodic
-      MODULE PROCEDURE implicit_poisson_solver_periodic_r3d, implicit_poisson_solver_periodic_pw
-   END INTERFACE
-
-   INTERFACE implicit_poisson_solver_neumann
-      MODULE PROCEDURE implicit_poisson_solver_neumann_r3d, implicit_poisson_solver_neumann_pw
-   END INTERFACE
-
-   INTERFACE implicit_poisson_solver_mixed_periodic
-      MODULE PROCEDURE implicit_poisson_solver_mixed_periodic_pw, implicit_poisson_solver_mixed_periodic_r3d
-   END INTERFACE
-
-   INTERFACE implicit_poisson_solver_mixed
-      MODULE PROCEDURE implicit_poisson_solver_mixed_r3d, implicit_poisson_solver_mixed_pw
-   END INTERFACE
 
    REAL(dp), PRIVATE, PARAMETER         :: large_error = 1.0E4_dp
 
@@ -203,14 +186,14 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_periodic_r3d(poisson_env, density, v_new, ehartree)
+   SUBROUTINE implicit_poisson_solver_periodic(poisson_env, density, v_new, ehartree)
 
       TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
       TYPE(pw_r3d_type), INTENT(IN)                      :: density
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: v_new
       REAL(dp), INTENT(OUT), OPTIONAL                    :: ehartree
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_periodic_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_periodic'
 
       INTEGER                                            :: handle, iter, max_iter, outp_unit, &
                                                             times_called
@@ -327,36 +310,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE implicit_poisson_solver_periodic_r3d
-
-! **************************************************************************************************
-!> \brief  implicit Poisson solver for periodic boundary conditions
-!> \param poisson_env poisson environment
-!> \param density electron density
-!> \param v_new electrostatic potential
-!> \param ehartree Hartree energy
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_periodic_pw(poisson_env, density, v_new, ehartree)
-
-      TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
-      TYPE(pw_type), INTENT(IN)                          :: density
-      TYPE(pw_type), INTENT(INOUT)                       :: v_new
-      REAL(dp), INTENT(OUT), OPTIONAL                    :: ehartree
-
-      TYPE(pw_r3d_type)                                  :: my_density, my_v_new
-
-      my_density%pw_grid => density%pw_grid
-      my_density%array => density%cr3d
-      my_density%in_space = density%in_space
-      my_v_new%pw_grid => v_new%pw_grid
-      my_v_new%array => v_new%cr3d
-      my_v_new%in_space = v_new%in_space
-      CALL implicit_poisson_solver_periodic_r3d(poisson_env, my_density, my_v_new, ehartree)
-
-   END SUBROUTINE implicit_poisson_solver_periodic_pw
+   END SUBROUTINE implicit_poisson_solver_periodic
 
 ! **************************************************************************************************
 !> \brief  implicit Poisson solver: zero-average solution of the Poisson equation
@@ -370,14 +324,14 @@ CONTAINS
 !>       11.2015 revised [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_neumann_r3d(poisson_env, density, v_new, ehartree)
+   SUBROUTINE implicit_poisson_solver_neumann(poisson_env, density, v_new, ehartree)
 
       TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
       TYPE(pw_r3d_type), INTENT(IN)                      :: density
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: v_new
       REAL(dp), INTENT(OUT), OPTIONAL                    :: ehartree
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_neumann_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_neumann'
 
       INTEGER                                            :: handle, iter, max_iter, &
                                                             neumann_directions, outp_unit, &
@@ -531,38 +485,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE implicit_poisson_solver_neumann_r3d
-
-! **************************************************************************************************
-!> \brief  implicit Poisson solver: zero-average solution of the Poisson equation
-!>         subject to homogeneous Neumann boundary conditions
-!> \param poisson_env poisson environment
-!> \param density electron density
-!> \param v_new electrostatic potential
-!> \param ehartree Hartree energy
-!> \par History
-!>       02.2015 created [Hossein Bani-Hashemian]
-!>       11.2015 revised [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_neumann_pw(poisson_env, density, v_new, ehartree)
-
-      TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
-      TYPE(pw_type), INTENT(IN)                          :: density
-      TYPE(pw_type), INTENT(INOUT)                       :: v_new
-      REAL(dp), INTENT(OUT), OPTIONAL                    :: ehartree
-
-      TYPE(pw_r3d_type)                                  :: my_density, my_v_new
-
-      my_density%pw_grid => density%pw_grid
-      my_density%array => density%cr3d
-      my_density%in_space = density%in_space
-      my_v_new%pw_grid => v_new%pw_grid
-      my_v_new%array => v_new%cr3d
-      my_v_new%in_space = v_new%in_space
-      CALL implicit_poisson_solver_neumann_r3d(poisson_env, my_density, my_v_new, ehartree)
-
-   END SUBROUTINE implicit_poisson_solver_neumann_pw
+   END SUBROUTINE implicit_poisson_solver_neumann
 
 ! **************************************************************************************************
 !> \brief  implicit Poisson solver for mixed-periodic boundary conditions (periodic + Dirichlet)
@@ -574,14 +497,14 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_mixed_periodic_r3d(poisson_env, density, v_new, electric_enthalpy)
+   SUBROUTINE implicit_poisson_solver_mixed_periodic(poisson_env, density, v_new, electric_enthalpy)
 
       TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
       TYPE(pw_r3d_type), INTENT(IN)                      :: density
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: v_new
       REAL(dp), INTENT(OUT), OPTIONAL                    :: electric_enthalpy
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_mixed_periodic_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_mixed_periodic'
 
       INTEGER :: data_size, handle, iter, j, lb1, lb2, lb3, max_iter, n_contacts, n_tiles_tot, ng, &
          ngpts_local, nt, nt_tot, outp_unit, times_called, ub1, ub2, ub3
@@ -823,36 +746,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE implicit_poisson_solver_mixed_periodic_r3d
-
-! **************************************************************************************************
-!> \brief  implicit Poisson solver for mixed-periodic boundary conditions (periodic + Dirichlet)
-!> \param poisson_env poisson environment
-!> \param density electron density
-!> \param v_new electrostatic potential
-!> \param electric_enthalpy electric enthalpy
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_mixed_periodic_pw(poisson_env, density, v_new, electric_enthalpy)
-
-      TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
-      TYPE(pw_type), INTENT(IN)                          :: density
-      TYPE(pw_type), INTENT(INOUT)                       :: v_new
-      REAL(dp), INTENT(OUT), OPTIONAL                    :: electric_enthalpy
-
-      TYPE(pw_r3d_type)                                  :: my_density, my_v_new
-
-      my_density%pw_grid => density%pw_grid
-      my_density%array => density%cr3d
-      my_density%in_space = density%in_space
-      my_v_new%pw_grid => v_new%pw_grid
-      my_v_new%array => v_new%cr3d
-      my_v_new%in_space = v_new%in_space
-      CALL implicit_poisson_solver_mixed_periodic_r3d(poisson_env, my_density, my_v_new, electric_enthalpy)
-
-   END SUBROUTINE implicit_poisson_solver_mixed_periodic_pw
+   END SUBROUTINE implicit_poisson_solver_mixed_periodic
 
 ! **************************************************************************************************
 !> \brief  implicit Poisson solver for mixed boundary conditions (Neumann + Dirichlet)
@@ -865,14 +759,14 @@ CONTAINS
 !>       11.2015 revised [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_mixed_r3d(poisson_env, density, v_new, electric_enthalpy)
+   SUBROUTINE implicit_poisson_solver_mixed(poisson_env, density, v_new, electric_enthalpy)
 
       TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
       TYPE(pw_r3d_type), INTENT(IN)                      :: density
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: v_new
       REAL(dp), INTENT(OUT), OPTIONAL                    :: electric_enthalpy
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_mixed_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'implicit_poisson_solver_mixed'
 
       INTEGER :: data_size, handle, iter, j, lb1, lb2, lb3, max_iter, n_contacts, n_tiles_tot, &
          neumann_directions, ng, ngpts_local, nt, nt_tot, outp_unit, times_called, ub1, ub2, ub3
@@ -1145,37 +1039,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE implicit_poisson_solver_mixed_r3d
-
-! **************************************************************************************************
-!> \brief  implicit Poisson solver for mixed boundary conditions (Neumann + Dirichlet)
-!> \param poisson_env poisson environment
-!> \param density electron density
-!> \param v_new electrostatic potential
-!> \param electric_enthalpy electric enthalpy
-!> \par History
-!>       10.2014 created [Hossein Bani-Hashemian]
-!>       11.2015 revised [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE implicit_poisson_solver_mixed_pw(poisson_env, density, v_new, electric_enthalpy)
-
-      TYPE(pw_poisson_type), INTENT(IN)                  :: poisson_env
-      TYPE(pw_type), INTENT(IN)                          :: density
-      TYPE(pw_type), INTENT(INOUT)                       :: v_new
-      REAL(dp), INTENT(OUT), OPTIONAL                    :: electric_enthalpy
-
-      TYPE(pw_r3d_type)                                  :: my_density, my_v_new
-
-      my_density%pw_grid => density%pw_grid
-      my_density%array => density%cr3d
-      my_density%in_space = density%in_space
-      my_v_new%pw_grid => v_new%pw_grid
-      my_v_new%array => v_new%cr3d
-      my_v_new%in_space = v_new%in_space
-      CALL implicit_poisson_solver_mixed_r3d(poisson_env, my_density, my_v_new, electric_enthalpy)
-
-   END SUBROUTINE implicit_poisson_solver_mixed_pw
+   END SUBROUTINE implicit_poisson_solver_mixed
 
 ! **************************************************************************************************
 !> \brief  allocates and zeroises initial guess for implicit (iterative) Poisson solver
