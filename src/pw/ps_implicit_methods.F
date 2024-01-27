@@ -50,8 +50,7 @@ MODULE ps_implicit_methods
    USE pw_pool_types,                   ONLY: pw_pool_create,&
                                               pw_pool_release,&
                                               pw_pool_type
-   USE pw_types,                        ONLY: COMPLEXDATA1D,&
-                                              REALDATA3D,&
+   USE pw_types,                        ONLY: REALDATA3D,&
                                               REALSPACE,&
                                               RECIPROCALSPACE,&
                                               pw_c1d_type,&
@@ -70,10 +69,8 @@ MODULE ps_implicit_methods
       implicit_poisson_solver_mixed
 
    INTERFACE ps_implicit_compute_ehartree
-      MODULE PROCEDURE compute_ehartree_periodic_bc_r3d, &
-         compute_ehartree_mixed_bc_r3d
-      MODULE PROCEDURE compute_ehartree_periodic_bc_pw, &
-         compute_ehartree_mixed_bc_pw
+      MODULE PROCEDURE compute_ehartree_periodic_bc, &
+         compute_ehartree_mixed_bc
    END INTERFACE ps_implicit_compute_ehartree
 
    INTERFACE implicit_poisson_solver_periodic
@@ -149,7 +146,7 @@ CONTAINS
 ! v_eps
          NULLIFY (ps_implicit_env%v_eps)
          ALLOCATE (ps_implicit_env%v_eps)
-         CALL pw_pool%create_pw(ps_implicit_env%v_eps, use_data=REALDATA3D, in_space=REALSPACE)
+         CALL pw_pool%create_pw(ps_implicit_env%v_eps, in_space=REALSPACE)
          CALL pw_zero(ps_implicit_env%v_eps)
 
 ! constraint charge
@@ -157,12 +154,12 @@ CONTAINS
          SELECT CASE (boundary_condition)
          CASE (MIXED_PERIODIC_BC)
             ALLOCATE (ps_implicit_env%cstr_charge)
-            CALL pw_pool%create_pw(ps_implicit_env%cstr_charge, use_data=REALDATA3D, in_space=REALSPACE)
+            CALL pw_pool%create_pw(ps_implicit_env%cstr_charge, in_space=REALSPACE)
             CALL pw_zero(ps_implicit_env%cstr_charge)
          CASE (MIXED_BC)
             CALL pw_pool_create(pw_pool_xpndd, pw_grid=dct_pw_grid)
             ALLOCATE (ps_implicit_env%cstr_charge)
-            CALL pw_pool_xpndd%create_pw(ps_implicit_env%cstr_charge, use_data=REALDATA3D, in_space=REALSPACE)
+            CALL pw_pool_xpndd%create_pw(ps_implicit_env%cstr_charge, in_space=REALSPACE)
             CALL pw_zero(ps_implicit_env%cstr_charge)
             CALL pw_pool_release(pw_pool_xpndd)
          END SELECT
@@ -256,15 +253,15 @@ CONTAINS
          CALL pw_copy(ps_implicit_env%initial_guess, v_old)
       END IF
 
-      g%array = fourpi*density%array/dielectric%eps%cr3d
+      g%array = fourpi*density%array/dielectric%eps%array
 
 ! res_old = g - \Delta(v_old) - P(v_old)
-      CALL apply_poisson_operator_fft_r3d(pw_pool, green, dielectric, v_old, res_old)
+      CALL apply_poisson_operator_fft(pw_pool, green, dielectric, v_old, res_old)
       CALL pw_scale(res_old, -1.0_dp)
       CALL pw_axpy(g, res_old)
 
 ! evaluate \Delta^-1(res_old)
-      CALL apply_inv_laplace_operator_fft_r3d(pw_pool, green, res_old, QAinvxres)
+      CALL apply_inv_laplace_operator_fft(pw_pool, green, res_old, QAinvxres)
 
       iter = 1
       DO
@@ -276,14 +273,14 @@ CONTAINS
 
 ! res_new = res_old - \omega * ( \Delta(QAinvxres_old) + P(QAinvxres_old) )
 !         = (1 - \omega) * res_old - \omega * PxQAinvxres
-         CALL apply_P_operator_r3d(pw_pool, dielectric, QAinvxres, PxQAinvxres)
+         CALL apply_P_operator(pw_pool, dielectric, QAinvxres, PxQAinvxres)
          CALL pw_copy(PxQAinvxres, res_new)
          CALL pw_scale(res_new, -1.0_dp)
          CALL pw_axpy(res_old, res_new, 1.0_dp - omega)
 
 ! compute the error
-         CALL ps_implicit_compute_error_fft_r3d(pw_pool, green, res_new, v_old, v_new, QAinvxres, &
-                                                pres_error, nabs_error)
+         CALL ps_implicit_compute_error_fft(pw_pool, green, res_new, v_old, v_new, QAinvxres, &
+                                            pres_error, nabs_error)
 ! output
          CALL ps_implicit_output(iter, pres_error, nabs_error, outp_unit)
          IF (PRESENT(ehartree)) THEN
@@ -317,8 +314,8 @@ CONTAINS
       BLOCK
          TYPE(pw_r3d_type) :: v_eps
          v_eps%pw_grid => ps_implicit_env%v_eps%pw_grid
-         v_eps%array => ps_implicit_env%v_eps%cr3d
-         CALL ps_implicit_compute_veps_r3d(pw_pool, dielectric, v_new, v_eps)
+         v_eps%array => ps_implicit_env%v_eps%array
+         CALL ps_implicit_compute_veps(pw_pool, dielectric, v_new, v_eps)
       END BLOCK
 
       CALL pw_pool%give_back_pw(g)
@@ -450,15 +447,15 @@ CONTAINS
                      dct_env%recv_msgs_bnds, dct_env%dests_expand, dct_env%srcs_expand, &
                      dct_env%flipg_stat, dct_env%bounds_shftd, v_new, v_new_xpndd)
 
-      g%array = fourpi*density_xpndd%array/dielectric%eps%cr3d
+      g%array = fourpi*density_xpndd%array/dielectric%eps%array
 
 ! res_old = g - \Delta(v_old) - P(v_old)
-      CALL apply_poisson_operator_dct_r3d(pw_pool_xpndd, green, dielectric, v_old, res_old)
+      CALL apply_poisson_operator_dct(pw_pool_xpndd, green, dielectric, v_old, res_old)
       CALL pw_scale(res_old, -1.0_dp)
       CALL pw_axpy(g, res_old)
 
 ! evaluate \Delta^-1(res_old)
-      CALL apply_inv_laplace_operator_dct_r3d(pw_pool_xpndd, green, res_old, QAinvxres)
+      CALL apply_inv_laplace_operator_dct(pw_pool_xpndd, green, res_old, QAinvxres)
 
       iter = 1
       DO
@@ -470,14 +467,14 @@ CONTAINS
 
 ! res_new = res_old - \omega * ( \Delta(QAinvxres_old) + P(QAinvxres_old) )
 !         = (1 - \omega) * res_old - \omega * PxQAinvxres
-         CALL apply_P_operator_r3d(pw_pool_xpndd, dielectric, QAinvxres, PxQAinvxres)
+         CALL apply_P_operator(pw_pool_xpndd, dielectric, QAinvxres, PxQAinvxres)
          CALL pw_copy(PxQAinvxres, res_new)
          CALL pw_scale(res_new, -1.0_dp)
          CALL pw_axpy(res_old, res_new, 1.0_dp - omega)
 
 ! compute the error
-         CALL ps_implicit_compute_error_dct_r3d(pw_pool_xpndd, green, res_new, v_old, v_new_xpndd, QAinvxres, &
-                                                pres_error, nabs_error)
+         CALL ps_implicit_compute_error_dct(pw_pool_xpndd, green, res_new, v_old, v_new_xpndd, QAinvxres, &
+                                            pres_error, nabs_error)
 ! output
          CALL ps_implicit_output(iter, pres_error, nabs_error, outp_unit)
          IF (PRESENT(ehartree)) THEN
@@ -512,11 +509,11 @@ CONTAINS
       IF (PRESENT(ehartree)) ehartree = ps_implicit_env%ehartree
 ! compute the extra contribution to the Hamiltonian due to the presence of dielectric
 ! veps has to be computed for the expanded data and then shrunk otherwise we loose accuracy
-      CALL ps_implicit_compute_veps_r3d(pw_pool_xpndd, dielectric, v_new_xpndd, v_eps_xpndd)
+      CALL ps_implicit_compute_veps(pw_pool_xpndd, dielectric, v_new_xpndd, v_eps_xpndd)
       BLOCK
          TYPE(pw_r3d_type) :: v_eps
          v_eps%pw_grid => ps_implicit_env%v_eps%pw_grid
-         v_eps%array => ps_implicit_env%v_eps%cr3d
+         v_eps%array => ps_implicit_env%v_eps%array
          CALL pw_shrink(neumann_directions, dct_env%dests_shrink, dct_env%srcs_shrink, &
                         dct_env%bounds_local_shftd, v_eps_xpndd, v_eps)
       END BLOCK
@@ -687,13 +684,13 @@ CONTAINS
          lambda0(:) = ps_implicit_env%initial_lambda
       END IF
 
-      g%array = fourpi*density%array/dielectric%eps%cr3d
+      g%array = fourpi*density%array/dielectric%eps%array
       g_avg = accurate_sum(g%array)/ngpts
 
       lambda_old(:) = lambda0
 
 ! res_old = g - \Delta(v_old) - P(v_old) - B^t * \lambda_old
-      CALL apply_poisson_operator_fft_r3d(pw_pool, green, dielectric, v_old, res_old)
+      CALL apply_poisson_operator_fft(pw_pool, green, dielectric, v_old, res_old)
       CALL pw_scale(res_old, -1.0_dp)
       CALL pw_axpy(g, res_old)
       IF (data_size .NE. 0) THEN
@@ -703,7 +700,7 @@ CONTAINS
       res_old%array = res_old%array - Btxlambda_old3D
 
 ! evaluate \Delta^-1(res_old)
-      CALL apply_inv_laplace_operator_fft_r3d(pw_pool, green, res_old, QAinvxres)
+      CALL apply_inv_laplace_operator_fft(pw_pool, green, res_old, QAinvxres)
 
       iter = 1
       DO
@@ -715,7 +712,7 @@ CONTAINS
 
 ! evaluate 1^t * (g - \Delta(\bar{v}) - P(\bar{v}))
 !        = 1^t * (g - P(\bar{v}))
-         CALL apply_P_operator_r3d(pw_pool, dielectric, v_new, Axvbar)
+         CALL apply_P_operator(pw_pool, dielectric, v_new, Axvbar)
          Axvbar_avg = accurate_sum(Axvbar%array)/ngpts
          gminusAxvbar_avg = g_avg - Axvbar_avg
          CALL pw_grid%para%group%sum(gminusAxvbar_avg)
@@ -744,14 +741,14 @@ CONTAINS
 ! res_new = res_old - \omega * ( \Delta(QAinvxres_old) + P(QAinvxres_old) ) - B^t * ( \lambda_new - \lambda_old )
 !         = (1 - \omega) * res_old - \omega * P(QAinvxres_old) - B^t * ( \lambda_new - \lambda_old )
          CALL pw_zero(res_new)
-         CALL apply_P_operator_r3d(pw_pool, dielectric, QAinvxres, PxQAinvxres)
+         CALL apply_P_operator(pw_pool, dielectric, QAinvxres, PxQAinvxres)
          CALL pw_axpy(PxQAinvxres, res_new, -1.0_dp)
          CALL pw_axpy(res_old, res_new, 1.0_dp - omega)
          res_new%array = res_new%array + Btxlambda_old3D - Btxlambda_new3D
 
 ! compute the error
-         CALL ps_implicit_compute_error_fft_r3d(pw_pool, green, res_new, v_old, v_new, QAinvxres, &
-                                                pres_error, nabs_error)
+         CALL ps_implicit_compute_error_fft(pw_pool, green, res_new, v_old, v_new, QAinvxres, &
+                                            pres_error, nabs_error)
 ! output
          CALL ps_implicit_output(iter, pres_error, nabs_error, outp_unit)
          IF (PRESENT(electric_enthalpy)) THEN
@@ -806,14 +803,14 @@ CONTAINS
          ps_implicit_env%initial_lambda(:) = lambda_new
       END IF
 
-      ps_implicit_env%cstr_charge%cr3d = Btxlambda_new3D
+      ps_implicit_env%cstr_charge%array = Btxlambda_new3D
       IF (PRESENT(electric_enthalpy)) electric_enthalpy = ps_implicit_env%electric_enthalpy
 ! compute the extra contribution to the Hamiltonian due to the presence of dielectric
       BLOCK
          TYPE(pw_r3d_type) :: tmp
          tmp%pw_grid => ps_implicit_env%v_eps%pw_grid
-         tmp%array => ps_implicit_env%v_eps%cr3d
-         CALL ps_implicit_compute_veps_r3d(pw_pool, dielectric, v_new, tmp)
+         tmp%array => ps_implicit_env%v_eps%array
+         CALL ps_implicit_compute_veps(pw_pool, dielectric, v_new, tmp)
       END BLOCK
 
       CALL pw_pool%give_back_pw(g)
@@ -1004,13 +1001,13 @@ CONTAINS
                      dct_env%recv_msgs_bnds, dct_env%dests_expand, dct_env%srcs_expand, &
                      dct_env%flipg_stat, dct_env%bounds_shftd, v_new, v_new_xpndd)
 
-      g%array = fourpi*density_xpndd%array/dielectric%eps%cr3d
+      g%array = fourpi*density_xpndd%array/dielectric%eps%array
       g_avg = accurate_sum(g%array)/ngpts
 
       lambda_old(:) = lambda0
 
 ! res_old = g - \Delta(v_old) - P(v_old) - B^t * \lambda_old
-      CALL apply_poisson_operator_dct_r3d(pw_pool_xpndd, green, dielectric, v_old, res_old)
+      CALL apply_poisson_operator_dct(pw_pool_xpndd, green, dielectric, v_old, res_old)
       CALL pw_scale(res_old, -1.0_dp)
       CALL pw_axpy(g, res_old)
       IF (data_size .NE. 0) THEN
@@ -1020,7 +1017,7 @@ CONTAINS
       res_old%array = res_old%array - Btxlambda_old3D
 
 ! evaluate \Delta^-1(res_old)
-      CALL apply_inv_laplace_operator_dct_r3d(pw_pool_xpndd, green, res_old, QAinvxres)
+      CALL apply_inv_laplace_operator_dct(pw_pool_xpndd, green, res_old, QAinvxres)
 
       iter = 1
       DO
@@ -1032,7 +1029,7 @@ CONTAINS
 
 ! evaluate 1^t * (g - \Delta(\bar{v}) - P(\bar{v}))
 !        = 1^t * (g - P(\bar{v}))
-         CALL apply_P_operator_r3d(pw_pool_xpndd, dielectric, v_new_xpndd, Axvbar)
+         CALL apply_P_operator(pw_pool_xpndd, dielectric, v_new_xpndd, Axvbar)
          Axvbar_avg = accurate_sum(Axvbar%array)/ngpts
          gminusAxvbar_avg = g_avg - Axvbar_avg
          CALL dct_pw_grid%para%group%sum(gminusAxvbar_avg)
@@ -1061,14 +1058,14 @@ CONTAINS
 ! res_new = res_old - \omega * ( \Delta(QAinvxres_old) + P(QAinvxres_old) ) - B^t * ( \lambda_new - \lambda_old )
 !         = (1 - \omega) * res_old - \omega * P(QAinvxres_old) - B^t * ( \lambda_new - \lambda_old )
          CALL pw_zero(res_new)
-         CALL apply_P_operator_r3d(pw_pool_xpndd, dielectric, QAinvxres, PxQAinvxres)
+         CALL apply_P_operator(pw_pool_xpndd, dielectric, QAinvxres, PxQAinvxres)
          CALL pw_axpy(PxQAinvxres, res_new, -1.0_dp)
          CALL pw_axpy(res_old, res_new, 1.0_dp - omega)
          res_new%array = res_new%array - Btxlambda_new3D + Btxlambda_old3D
 
 ! compute the error
-         CALL ps_implicit_compute_error_dct_r3d(pw_pool_xpndd, green, res_new, v_old, v_new_xpndd, QAinvxres, &
-                                                pres_error, nabs_error)
+         CALL ps_implicit_compute_error_dct(pw_pool_xpndd, green, res_new, v_old, v_new_xpndd, QAinvxres, &
+                                            pres_error, nabs_error)
 ! output
          CALL ps_implicit_output(iter, pres_error, nabs_error, outp_unit)
          IF (PRESENT(electric_enthalpy)) THEN
@@ -1127,19 +1124,12 @@ CONTAINS
          ps_implicit_env%initial_lambda(:) = lambda_new
       END IF
 
-      ps_implicit_env%cstr_charge%cr3d = Btxlambda_new3D
+      ps_implicit_env%cstr_charge%array = Btxlambda_new3D
       IF (PRESENT(electric_enthalpy)) electric_enthalpy = ps_implicit_env%electric_enthalpy
 ! compute the extra contribution to the Hamiltonian due to the presence of dielectric
-      CALL ps_implicit_compute_veps_r3d(pw_pool_xpndd, dielectric, v_new_xpndd, v_eps_xpndd)
-      BLOCK
-         TYPE(pw_type) :: tmp
-         tmp%pw_grid => v_eps_xpndd%pw_grid
-         tmp%cr3d => v_eps_xpndd%array
-         tmp%in_use = REALDATA3D
-         tmp%in_space = v_eps_xpndd%in_space
-         CALL pw_shrink(neumann_directions, dct_env%dests_shrink, dct_env%srcs_shrink, &
-                        dct_env%bounds_local_shftd, tmp, ps_implicit_env%v_eps)
-      END BLOCK
+      CALL ps_implicit_compute_veps(pw_pool_xpndd, dielectric, v_new_xpndd, v_eps_xpndd)
+      CALL pw_shrink(neumann_directions, dct_env%dests_shrink, dct_env%srcs_shrink, &
+                     dct_env%bounds_local_shftd, v_eps_xpndd, ps_implicit_env%v_eps)
 
       CALL pw_pool_xpndd%give_back_pw(g)
       CALL pw_pool_xpndd%give_back_pw(v_old)
@@ -1255,7 +1245,7 @@ CONTAINS
       TYPE(dct_type), POINTER                            :: dct_env
       TYPE(pw_grid_type), POINTER                        :: pw_grid_orig
       TYPE(pw_pool_type), POINTER                        :: pw_pool_xpndd
-      TYPE(pw_type)                                      :: pw_in, pw_out
+      TYPE(pw_r3d_type)                                  :: pw_in, pw_out
 
       CALL timeset(routineN, handle)
 
@@ -1354,7 +1344,7 @@ CONTAINS
             indx2 = indx1 + n_tiles - 1
             DO i = 1, n_tiles
 
-               CALL pw_pool_xpndd%create_pw(pw_in, use_data=REALDATA3D, in_space=REALSPACE)
+               CALL pw_pool_xpndd%create_pw(pw_in, in_space=REALSPACE)
                CALL pw_expand(neumann_directions, &
                               dct_env%recv_msgs_bnds, dct_env%dests_expand, dct_env%srcs_expand, &
                               dct_env%flipg_stat, dct_env%bounds_shftd, &
@@ -1362,11 +1352,11 @@ CONTAINS
 
                tile_volume = ps_implicit_env%contacts(j)%dirichlet_bc%tiles(i)%tile%volume
                CALL pw_scale(pw_in, 1.0_dp/(vol_scfac*tile_volume)) ! normalize tile_pw
-               ps_implicit_env%Bt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_in%cr3d, (/data_size/))
+               ps_implicit_env%Bt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_in%array, (/data_size/))
 
-               CALL pw_pool_xpndd%create_pw(pw_out, use_data=REALDATA3D, in_space=REALSPACE)
-               CALL apply_inv_laplace_operator_dct_pw(pw_pool_xpndd, green, pw_in, pw_out)
-               QAinvxBt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_out%cr3d, (/data_size/))
+               CALL pw_pool_xpndd%create_pw(pw_out, in_space=REALSPACE)
+               CALL apply_inv_laplace_operator_dct(pw_pool_xpndd, green, pw_in, pw_out)
+               QAinvxBt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_out%array, (/data_size/))
                ! the electrostatic potential has opposite sign by internal convention
                ps_implicit_env%v_D(indx1 + i - 1) = -1.0_dp*ps_implicit_env%contacts(j)%dirichlet_bc%v_D
                ps_implicit_env%osc_frac(indx1 + i - 1) = ps_implicit_env%contacts(j)%dirichlet_bc%osc_frac
@@ -1486,16 +1476,16 @@ CONTAINS
             n_tiles = ps_implicit_env%contacts(j)%dirichlet_bc%n_tiles
             indx2 = indx1 + n_tiles - 1
             DO i = 1, n_tiles
-               CALL pw_pool_orig%create_pw(pw_in, use_data=REALDATA3D, in_space=REALSPACE)
+               CALL pw_pool_orig%create_pw(pw_in, in_space=REALSPACE)
                CALL pw_copy(ps_implicit_env%contacts(j)%dirichlet_bc%tiles(i)%tile%tile_pw, pw_in)
 
                tile_volume = ps_implicit_env%contacts(j)%dirichlet_bc%tiles(i)%tile%volume
                CALL pw_scale(pw_in, 1.0_dp/tile_volume) ! normalize tile_pw
-               ps_implicit_env%Bt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_in%cr3d, (/data_size/))
+               ps_implicit_env%Bt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_in%array, (/data_size/))
 
-               CALL pw_pool_orig%create_pw(pw_out, use_data=REALDATA3D, in_space=REALSPACE)
-               CALL apply_inv_laplace_operator_fft_pw(pw_pool_orig, green, pw_in, pw_out)
-               QAinvxBt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_out%cr3d, (/data_size/))
+               CALL pw_pool_orig%create_pw(pw_out, in_space=REALSPACE)
+               CALL apply_inv_laplace_operator_fft(pw_pool_orig, green, pw_in, pw_out)
+               QAinvxBt(ps_implicit_env%idx_1dto3d, indx1 + i - 1) = RESHAPE(pw_out%array, (/data_size/))
                ! the electrostatic potential has opposite sign by internal convention
                ps_implicit_env%v_D(indx1 + i - 1) = -1.0_dp*ps_implicit_env%contacts(j)%dirichlet_bc%v_D
                ps_implicit_env%osc_frac(indx1 + i - 1) = ps_implicit_env%contacts(j)%dirichlet_bc%osc_frac
@@ -1584,14 +1574,14 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_P_operator_r3d(pw_pool, dielectric, v, Pxv)
+   SUBROUTINE apply_P_operator(pw_pool, dielectric, v, Pxv)
 
       TYPE(pw_pool_type), POINTER                        :: pw_pool
       TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
       TYPE(pw_r3d_type), INTENT(IN)                      :: v
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: Pxv
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_P_operator_r3d'
+      CHARACTER(LEN=*), PARAMETER                        :: routineN = 'apply_P_operator'
 
       INTEGER                                            :: handle, i
       TYPE(pw_r3d_type), DIMENSION(3)                    :: dv
@@ -1604,9 +1594,9 @@ CONTAINS
 
       CALL derive_fft(v, dv, pw_pool)
       ASSOCIATE (dln_eps => dielectric%dln_eps)
-         Pxv%array = -(dv(1)%array*dln_eps(1)%cr3d + &
-                       dv(2)%array*dln_eps(2)%cr3d + &
-                       dv(3)%array*dln_eps(3)%cr3d)
+         Pxv%array = -(dv(1)%array*dln_eps(1)%array + &
+                       dv(2)%array*dln_eps(2)%array + &
+                       dv(3)%array*dln_eps(3)%array)
       END ASSOCIATE
 
       DO i = 1, 3
@@ -1615,52 +1605,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_P_operator_r3d
-
-! **************************************************************************************************
-!> \brief   Evaluates the action of the operator P on a given matrix v, defined
-!>          as:   P(v) := - \nabla_r(\ln(\eps)) \cdot \nabla_r(v)
-!> \param pw_pool pool of pw grid
-!> \param dielectric dielectric_type containing eps
-!> \param v input matrix
-!> \param Pxv action of the operator P on v
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_P_operator_pw(pw_pool, dielectric, v, Pxv)
-
-      TYPE(pw_pool_type), POINTER                        :: pw_pool
-      TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
-      TYPE(pw_type), INTENT(IN)                          :: v
-      TYPE(pw_type), INTENT(INOUT)                       :: Pxv
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_P_operator_pw'
-
-      INTEGER                                            :: handle, i
-      TYPE(pw_type), DIMENSION(3)                        :: dv
-
-      CALL timeset(routineN, handle)
-
-      DO i = 1, 3
-         CALL pw_pool%create_pw(dv(i), &
-                                use_data=REALDATA3D, in_space=REALSPACE)
-      END DO
-
-      CALL derive_fft(v, dv, pw_pool)
-      ASSOCIATE (dln_eps => dielectric%dln_eps)
-         Pxv%cr3d = -(dv(1)%cr3d*dln_eps(1)%cr3d + &
-                      dv(2)%cr3d*dln_eps(2)%cr3d + &
-                      dv(3)%cr3d*dln_eps(3)%cr3d)
-      END ASSOCIATE
-
-      DO i = 1, 3
-         CALL pw_pool%give_back_pw(dv(i))
-      END DO
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_P_operator_pw
+   END SUBROUTINE apply_P_operator
 
 ! **************************************************************************************************
 !> \brief  Evaluates the action of the inverse of the Laplace operator on a given 3d matrix
@@ -1672,14 +1617,14 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_inv_laplace_operator_fft_r3d(pw_pool, green, pw_in, pw_out)
+   SUBROUTINE apply_inv_laplace_operator_fft(pw_pool, green, pw_in, pw_out)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
       TYPE(pw_r3d_type), INTENT(IN)                      :: pw_in
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: pw_out
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_inv_laplace_operator_fft_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_inv_laplace_operator_fft'
 
       INTEGER                                            :: handle, ig, ng
       REAL(dp)                                           :: prefactor
@@ -1706,54 +1651,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_inv_laplace_operator_fft_r3d
-
-! **************************************************************************************************
-!> \brief  Evaluates the action of the inverse of the Laplace operator on a given 3d matrix
-!> \param pw_pool pool of pw grid
-!> \param green green functions for FFT based inverse Laplacian
-!> \param pw_in pw_in (density)
-!> \param pw_out pw_out (potential)
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_inv_laplace_operator_fft_pw(pw_pool, green, pw_in, pw_out)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(pw_type), INTENT(IN)                          :: pw_in
-      TYPE(pw_type), INTENT(INOUT)                       :: pw_out
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_inv_laplace_operator_fft_pw'
-
-      INTEGER                                            :: handle, ig, ng
-      REAL(dp)                                           :: prefactor
-      TYPE(pw_grid_type), POINTER                        :: pw_grid
-      TYPE(pw_type)                                      :: pw_in_gs
-
-      CALL timeset(routineN, handle)
-
-! here I divide by fourpi to cancel out the prefactor fourpi in influence_fn
-      prefactor = 1.0_dp/fourpi
-
-      pw_grid => pw_pool%pw_grid
-      ng = SIZE(pw_grid%gsq)
-
-      CALL pw_pool%create_pw(pw_in_gs, &
-                             use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
-
-      CALL pw_transfer(pw_in, pw_in_gs)
-      DO ig = 1, ng
-         pw_in_gs%cc(ig) = prefactor*pw_in_gs%cc(ig)*green%influence_fn%array(ig)
-      END DO
-      CALL pw_transfer(pw_in_gs, pw_out)
-
-      CALL pw_pool%give_back_pw(pw_in_gs)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_inv_laplace_operator_fft_pw
+   END SUBROUTINE apply_inv_laplace_operator_fft
 
 ! **************************************************************************************************
 !> \brief  Evaluates the action of the inverse of the Laplace operator on a given
@@ -1767,14 +1665,14 @@ CONTAINS
 !>       11.2015 revised [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_inv_laplace_operator_dct_r3d(pw_pool, green, pw_in, pw_out)
+   SUBROUTINE apply_inv_laplace_operator_dct(pw_pool, green, pw_in, pw_out)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
       TYPE(pw_r3d_type), INTENT(IN)                      :: pw_in
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: pw_out
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_inv_laplace_operator_dct_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_inv_laplace_operator_dct'
 
       INTEGER                                            :: handle, ig, ng
       REAL(dp)                                           :: prefactor
@@ -1801,56 +1699,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_inv_laplace_operator_dct_r3d
-
-! **************************************************************************************************
-!> \brief  Evaluates the action of the inverse of the Laplace operator on a given
-!>         3d matrix using DCT-I
-!> \param pw_pool pool of pw grid
-!> \param green the greens_fn_type data holding a valid dct_influence_fn
-!> \param pw_in pw_in (density)
-!> \param pw_out pw_out (potential)
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!>       11.2015 revised [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_inv_laplace_operator_dct_pw(pw_pool, green, pw_in, pw_out)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(pw_type), INTENT(IN)                          :: pw_in
-      TYPE(pw_type), INTENT(INOUT)                       :: pw_out
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_inv_laplace_operator_dct_pw'
-
-      INTEGER                                            :: handle, ig, ng
-      REAL(dp)                                           :: prefactor
-      TYPE(pw_grid_type), POINTER                        :: pw_grid
-      TYPE(pw_type)                                      :: pw_in_gs
-
-      CALL timeset(routineN, handle)
-
-! here I divide by fourpi to cancel out the prefactor fourpi in influence_fn
-      prefactor = 1.0_dp/fourpi
-
-      pw_grid => pw_pool%pw_grid
-      ng = SIZE(pw_grid%gsq)
-
-      CALL pw_pool%create_pw(pw_in_gs, &
-                             use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
-
-      CALL pw_transfer(pw_in, pw_in_gs)
-      DO ig = 1, ng
-         pw_in_gs%cc(ig) = prefactor*pw_in_gs%cc(ig)*green%dct_influence_fn%cc(ig)
-      END DO
-      CALL pw_transfer(pw_in_gs, pw_out)
-
-      CALL pw_pool%give_back_pw(pw_in_gs)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_inv_laplace_operator_dct_pw
+   END SUBROUTINE apply_inv_laplace_operator_dct
 
 ! **************************************************************************************************
 !> \brief  Evaluates the action of the Laplace operator on a given 3d matrix
@@ -1862,14 +1711,14 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_laplace_operator_fft_r3d(pw_pool, green, pw_in, pw_out)
+   SUBROUTINE apply_laplace_operator_fft(pw_pool, green, pw_in, pw_out)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
       TYPE(pw_r3d_type), INTENT(IN)                      :: pw_in
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: pw_out
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_laplace_operator_fft_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_laplace_operator_fft'
 
       INTEGER                                            :: g0_index, handle, ig, ng
       LOGICAL                                            :: have_g0
@@ -1904,62 +1753,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_laplace_operator_fft_r3d
-
-! **************************************************************************************************
-!> \brief  Evaluates the action of the Laplace operator on a given 3d matrix
-!> \param pw_pool pool of pw grid
-!> \param green green functions for FFT based inverse Laplacian
-!> \param pw_in pw_in (potential)
-!> \param pw_out pw_out (density)
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_laplace_operator_fft_pw(pw_pool, green, pw_in, pw_out)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(pw_type), INTENT(IN)                          :: pw_in
-      TYPE(pw_type), INTENT(INOUT)                       :: pw_out
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_laplace_operator_fft_pw'
-
-      INTEGER                                            :: g0_index, handle, ig, ng
-      LOGICAL                                            :: have_g0
-      REAL(dp)                                           :: prefactor
-      TYPE(pw_grid_type), POINTER                        :: pw_grid
-      TYPE(pw_type)                                      :: pw_in_gs
-
-      CALL timeset(routineN, handle)
-
-! here I multiply by fourpi to cancel out the prefactor fourpi in influence_fn
-      prefactor = fourpi
-
-      pw_grid => pw_pool%pw_grid
-      ng = SIZE(pw_in%pw_grid%gsq)
-      have_g0 = green%influence_fn%pw_grid%have_g0
-
-      CALL pw_pool%create_pw(pw_in_gs, &
-                             use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
-
-      CALL pw_transfer(pw_in, pw_in_gs)
-
-      IF (have_g0) THEN
-         g0_index = green%influence_fn%pw_grid%first_gne0 - 1
-         pw_in_gs%cc(g0_index) = 0.0_dp
-      END IF
-      DO ig = green%influence_fn%pw_grid%first_gne0, ng
-         pw_in_gs%cc(ig) = prefactor*(pw_in_gs%cc(ig)/green%influence_fn%array(ig))
-      END DO
-
-      CALL pw_transfer(pw_in_gs, pw_out)
-
-      CALL pw_pool%give_back_pw(pw_in_gs)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_laplace_operator_fft_pw
+   END SUBROUTINE apply_laplace_operator_fft
 
 ! **************************************************************************************************
 !> \brief  Evaluates the action of the Laplace operator on a given 3d matrix using DCT-I
@@ -1972,14 +1766,14 @@ CONTAINS
 !>       11.2015 revised [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_laplace_operator_dct_r3d(pw_pool, green, pw_in, pw_out)
+   SUBROUTINE apply_laplace_operator_dct(pw_pool, green, pw_in, pw_out)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
       TYPE(pw_r3d_type), INTENT(IN)                      :: pw_in
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: pw_out
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_laplace_operator_dct_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_laplace_operator_dct'
 
       INTEGER                                            :: g0_index, handle, ig, ng
       LOGICAL                                            :: have_g0
@@ -2014,62 +1808,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_laplace_operator_dct_r3d
-
-! **************************************************************************************************
-!> \brief  Evaluates the action of the Laplace operator on a given 3d matrix using DCT-I
-!> \param pw_pool pool of pw grid
-!> \param green the greens_fn_type data holding a valid dct_influence_fn
-!> \param pw_in pw_in (potential)
-!> \param pw_out pw_out (density)
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!>       11.2015 revised [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_laplace_operator_dct_pw(pw_pool, green, pw_in, pw_out)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(pw_type), INTENT(IN)                          :: pw_in
-      TYPE(pw_type), INTENT(INOUT)                       :: pw_out
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_laplace_operator_dct_pw'
-
-      INTEGER                                            :: g0_index, handle, ig, ng
-      LOGICAL                                            :: have_g0
-      REAL(dp)                                           :: prefactor
-      TYPE(pw_grid_type), POINTER                        :: pw_grid
-      TYPE(pw_type)                                      :: pw_in_gs
-
-      CALL timeset(routineN, handle)
-
-! here I multiply by fourpi to cancel out the prefactor fourpi in influence_fn
-      prefactor = fourpi
-
-      pw_grid => pw_pool%pw_grid
-      ng = SIZE(pw_in%pw_grid%gsq)
-      have_g0 = green%dct_influence_fn%pw_grid%have_g0
-
-      CALL pw_pool%create_pw(pw_in_gs, use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
-
-      CALL pw_transfer(pw_in, pw_in_gs)
-
-      IF (have_g0) THEN
-         g0_index = green%dct_influence_fn%pw_grid%first_gne0 - 1
-         pw_in_gs%cc(g0_index) = 0.0_dp
-      END IF
-      DO ig = green%dct_influence_fn%pw_grid%first_gne0, ng
-         pw_in_gs%cc(ig) = prefactor*(pw_in_gs%cc(ig)/green%dct_influence_fn%cc(ig))
-      END DO
-
-      CALL pw_transfer(pw_in_gs, pw_out)
-
-      CALL pw_pool%give_back_pw(pw_in_gs)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_laplace_operator_dct_pw
+   END SUBROUTINE apply_laplace_operator_dct
 
 ! **************************************************************************************************
 !> \brief  Evaluates the action of the generalized Poisson operator on a given 3d matrix.
@@ -2082,7 +1821,7 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_poisson_operator_fft_r3d(pw_pool, green, dielectric, v, density)
+   SUBROUTINE apply_poisson_operator_fft(pw_pool, green, dielectric, v, density)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
@@ -2090,7 +1829,7 @@ CONTAINS
       TYPE(pw_r3d_type), INTENT(IN)                      :: v
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: density
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_poisson_operator_fft_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_poisson_operator_fft'
 
       INTEGER                                            :: handle
       TYPE(pw_r3d_type)                                  :: Pxv
@@ -2099,54 +1838,15 @@ CONTAINS
 
       CALL pw_pool%create_pw(Pxv, in_space=REALSPACE)
 
-      CALL apply_P_operator_r3d(pw_pool, dielectric, v, Pxv)
-      CALL apply_laplace_operator_fft_r3d(pw_pool, green, v, density)
+      CALL apply_P_operator(pw_pool, dielectric, v, Pxv)
+      CALL apply_laplace_operator_fft(pw_pool, green, v, density)
       CALL pw_axpy(Pxv, density)
 
       CALL pw_pool%give_back_pw(Pxv)
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_poisson_operator_fft_r3d
-
-! **************************************************************************************************
-!> \brief  Evaluates the action of the generalized Poisson operator on a given 3d matrix.
-!> \param pw_pool pool of pw grid
-!> \param green green functions for FFT based inverse Laplacian
-!> \param dielectric dielectric environment
-!> \param v potential
-!> \param density density
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_poisson_operator_fft_pw(pw_pool, green, dielectric, v, density)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
-      TYPE(pw_type), INTENT(IN)                          :: v
-      TYPE(pw_type), INTENT(INOUT)                       :: density
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_poisson_operator_fft_pw'
-
-      INTEGER                                            :: handle
-      TYPE(pw_type)                                      :: Pxv
-
-      CALL timeset(routineN, handle)
-
-      CALL pw_pool%create_pw(Pxv, &
-                             use_data=REALDATA3D, in_space=REALSPACE)
-
-      CALL apply_P_operator_pw(pw_pool, dielectric, v, Pxv)
-      CALL apply_laplace_operator_fft_pw(pw_pool, green, v, density)
-      CALL pw_axpy(Pxv, density)
-
-      CALL pw_pool%give_back_pw(Pxv)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_poisson_operator_fft_pw
+   END SUBROUTINE apply_poisson_operator_fft
 
 ! **************************************************************************************************
 !> \brief  Evaluates the action of the generalized Poisson operator on a given
@@ -2161,7 +1861,7 @@ CONTAINS
 !>       11.2015 revised [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE apply_poisson_operator_dct_r3d(pw_pool, green, dielectric, v, density)
+   SUBROUTINE apply_poisson_operator_dct(pw_pool, green, dielectric, v, density)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
@@ -2169,7 +1869,7 @@ CONTAINS
       TYPE(pw_r3d_type), INTENT(IN)                      :: v
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: density
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_poisson_operator_dct_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_poisson_operator_dct'
 
       INTEGER                                            :: handle
       TYPE(pw_r3d_type)                                  :: Pxv
@@ -2178,55 +1878,15 @@ CONTAINS
 
       CALL pw_pool%create_pw(Pxv, in_space=REALSPACE)
 
-      CALL apply_P_operator_r3d(pw_pool, dielectric, v, Pxv)
-      CALL apply_laplace_operator_dct_r3d(pw_pool, green, v, density)
+      CALL apply_P_operator(pw_pool, dielectric, v, Pxv)
+      CALL apply_laplace_operator_dct(pw_pool, green, v, density)
       CALL pw_axpy(Pxv, density)
 
       CALL pw_pool%give_back_pw(Pxv)
 
       CALL timestop(handle)
 
-   END SUBROUTINE apply_poisson_operator_dct_r3d
-
-! **************************************************************************************************
-!> \brief  Evaluates the action of the generalized Poisson operator on a given
-!>         3d matrix using DCT-I.
-!> \param pw_pool pool of pw grid
-!> \param green the greens_fn_type data holding a valid dct_influence_fn
-!> \param dielectric dielectric environment
-!> \param v potential
-!> \param density density
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!>       11.2015 revised [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE apply_poisson_operator_dct_pw(pw_pool, green, dielectric, v, density)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
-      TYPE(pw_type), INTENT(IN)                          :: v
-      TYPE(pw_type), INTENT(INOUT)                       :: density
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'apply_poisson_operator_dct_pw'
-
-      INTEGER                                            :: handle
-      TYPE(pw_type)                                      :: Pxv
-
-      CALL timeset(routineN, handle)
-
-      CALL pw_pool%create_pw(Pxv, use_data=REALDATA3D, in_space=REALSPACE)
-
-      CALL apply_P_operator_pw(pw_pool, dielectric, v, Pxv)
-      CALL apply_laplace_operator_dct_pw(pw_pool, green, v, density)
-      CALL pw_axpy(Pxv, density)
-
-      CALL pw_pool%give_back_pw(Pxv)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE apply_poisson_operator_dct_pw
+   END SUBROUTINE apply_poisson_operator_dct
 
 ! **************************************************************************************************
 !> \brief Computes the extra contribution (v_eps)
@@ -2242,14 +1902,14 @@ CONTAINS
 !>       08.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE ps_implicit_compute_veps_r3d(pw_pool, dielectric, v, v_eps)
+   SUBROUTINE ps_implicit_compute_veps(pw_pool, dielectric, v, v_eps)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
       TYPE(pw_r3d_type), INTENT(IN)                      :: v
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: v_eps
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_veps_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_veps'
 
       INTEGER                                            :: handle, i
       REAL(dp)                                           :: eightpi
@@ -2270,7 +1930,7 @@ CONTAINS
 ! evaluate |\nabla_r(v)|^2
       dv2%array = dv(1)%array**2 + dv(2)%array**2 + dv(3)%array**2
 
-      v_eps%array = -(1.0_dp/eightpi)*(dv2%array*dielectric%deps_drho%cr3d)
+      v_eps%array = -(1.0_dp/eightpi)*(dv2%array*dielectric%deps_drho%array)
 
       CALL pw_pool%give_back_pw(dv2)
       DO i = 1, 3
@@ -2279,62 +1939,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE ps_implicit_compute_veps_r3d
-
-! **************************************************************************************************
-!> \brief Computes the extra contribution (v_eps)
-!>        v_eps = - \frac{1}{8*\pi} * |\nabla_r(v)|^2 * \frac{d \eps}{d \rho}
-!>  to the functional derivative of the Hartree energy wrt the density, being
-!>  attributed to the dependency of the dielectric constant to the charge density.
-!> [see V. M. Sanchez, M. Sued, and D. A. Scherlis, J. Chem. Phys. 131, 174108 (2009)]
-!> \param pw_pool pool of the original plane-wave grid
-!> \param dielectric dielectric environment
-!> \param v Hartree potential
-!> \param v_eps v_eps
-!> \par History
-!>       08.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE ps_implicit_compute_veps_pw(pw_pool, dielectric, v, v_eps)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
-      TYPE(pw_type), INTENT(IN)                          :: v
-      TYPE(pw_type), INTENT(INOUT)                       :: v_eps
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_veps_pw'
-
-      INTEGER                                            :: handle, i
-      REAL(dp)                                           :: eightpi
-      TYPE(pw_type)                                      :: dv2
-      TYPE(pw_type), DIMENSION(3)                        :: dv
-
-      CALL timeset(routineN, handle)
-
-      eightpi = 2*fourpi
-
-      CALL pw_pool%create_pw(dv2, &
-                             use_data=REALDATA3D, in_space=REALSPACE)
-      DO i = 1, 3
-         CALL pw_pool%create_pw(dv(i), &
-                                use_data=REALDATA3D, in_space=REALSPACE)
-      END DO
-
-      CALL derive_fft(v, dv, pw_pool)
-
-! evaluate |\nabla_r(v)|^2
-      dv2%cr3d = dv(1)%cr3d**2 + dv(2)%cr3d**2 + dv(3)%cr3d**2
-
-      v_eps%cr3d = -(1.0_dp/eightpi)*(dv2%cr3d*dielectric%deps_drho%cr3d)
-
-      CALL pw_pool%give_back_pw(dv2)
-      DO i = 1, 3
-         CALL pw_pool%give_back_pw(dv(i))
-      END DO
-
-      CALL timestop(handle)
-
-   END SUBROUTINE ps_implicit_compute_veps_pw
+   END SUBROUTINE ps_implicit_compute_veps
 
 ! **************************************************************************************************
 !> \brief Computes the Hartree energy
@@ -2345,12 +1950,12 @@ CONTAINS
 !>       06.2015 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE compute_ehartree_periodic_bc_r3d(density, v, ehartree)
+   SUBROUTINE compute_ehartree_periodic_bc(density, v, ehartree)
 
       TYPE(pw_r3d_type), INTENT(IN)                      :: density, v
       REAL(dp), INTENT(OUT)                              :: ehartree
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'compute_ehartree_periodic_bc_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'compute_ehartree_periodic_bc'
 
       INTEGER                                            :: handle
 
@@ -2361,34 +1966,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE compute_ehartree_periodic_bc_r3d
-
-! **************************************************************************************************
-!> \brief Computes the Hartree energy
-!> \param density electronic density
-!> \param v Hartree potential
-!> \param ehartree Hartree energy
-!> \par History
-!>       06.2015 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE compute_ehartree_periodic_bc_pw(density, v, ehartree)
-
-      TYPE(pw_type), INTENT(IN)                          :: density, v
-      REAL(dp), INTENT(OUT)                              :: ehartree
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'compute_ehartree_periodic_bc_pw'
-
-      INTEGER                                            :: handle
-
-      CALL timeset(routineN, handle)
-
-! E_H = \frac{1}{2} * \int \rho * v dr
-      ehartree = 0.5_dp*pw_integral_ab(density, v)
-
-      CALL timestop(handle)
-
-   END SUBROUTINE compute_ehartree_periodic_bc_pw
+   END SUBROUTINE compute_ehartree_periodic_bc
 
 ! **************************************************************************************************
 !> \brief Computes the Hartree energy
@@ -2403,7 +1981,7 @@ CONTAINS
 !>       06.2015 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE compute_ehartree_mixed_bc_r3d(dielectric, density, Btxlambda, v, ehartree, electric_enthalpy)
+   SUBROUTINE compute_ehartree_mixed_bc(dielectric, density, Btxlambda, v, ehartree, electric_enthalpy)
 
       TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
       TYPE(pw_r3d_type), INTENT(IN)                      :: density
@@ -2412,7 +1990,7 @@ CONTAINS
       TYPE(pw_r3d_type), INTENT(IN)                      :: v
       REAL(dp), INTENT(OUT)                              :: ehartree, electric_enthalpy
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'compute_ehartree_mixed_bc_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'compute_ehartree_mixed_bc'
 
       INTEGER                                            :: handle
       REAL(dp)                                           :: dvol, ehartree_rho, ehartree_rho_cstr
@@ -2428,7 +2006,7 @@ CONTAINS
 ! the sign of the second term depends on the sign chosen for the Lagrange multiplier
 ! term in the variational form
       ehartree_rho = accurate_sum(density%array*v%array)
-      ehartree_rho_cstr = accurate_sum(dielectric%eps%cr3d*Btxlambda*v%array/fourpi)
+      ehartree_rho_cstr = accurate_sum(dielectric%eps%array*Btxlambda*v%array/fourpi)
       ehartree_rho = 0.5_dp*ehartree_rho*dvol
       ehartree_rho_cstr = 0.5_dp*ehartree_rho_cstr*dvol
       CALL pw_grid%para%group%sum(ehartree_rho)
@@ -2438,57 +2016,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE compute_ehartree_mixed_bc_r3d
-
-! **************************************************************************************************
-!> \brief Computes the Hartree energy
-!> \param dielectric dielectric environment
-!> \param density electronic density
-!> \param Btxlambda B^t * \lambda (\lambda is the vector of Lagrange multipliers
-!>                  and B^t is the transpose of the boundary operator
-!> \param v Hartree potential
-!> \param ehartree Hartree energy
-!> \param electric_enthalpy electric enthalpy
-!> \par History
-!>       06.2015 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE compute_ehartree_mixed_bc_pw(dielectric, density, Btxlambda, v, ehartree, electric_enthalpy)
-
-      TYPE(dielectric_type), INTENT(IN), POINTER         :: dielectric
-      TYPE(pw_type), INTENT(IN)                          :: density
-      REAL(dp), ALLOCATABLE, DIMENSION(:, :, :), &
-         INTENT(IN)                                      :: Btxlambda
-      TYPE(pw_type), INTENT(IN)                          :: v
-      REAL(dp), INTENT(OUT)                              :: ehartree, electric_enthalpy
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'compute_ehartree_mixed_bc_pw'
-
-      INTEGER                                            :: handle
-      REAL(dp)                                           :: dvol, ehartree_rho, ehartree_rho_cstr
-      TYPE(pw_grid_type), POINTER                        :: pw_grid
-
-      CALL timeset(routineN, handle)
-
-      pw_grid => v%pw_grid
-
-      dvol = pw_grid%dvol
-
-! E_H = \frac{1}{2} * \int \rho * v dr + \frac{1}{8 \pi} * \int Btxlambda * v dr
-! the sign of the second term depends on the sign chosen for the Lagrange multiplier
-! term in the variational form
-      ehartree_rho = accurate_sum(density%cr3d*v%cr3d)
-      ehartree_rho_cstr = accurate_sum(dielectric%eps%cr3d*Btxlambda*v%cr3d/fourpi)
-      ehartree_rho = 0.5_dp*ehartree_rho*dvol
-      ehartree_rho_cstr = 0.5_dp*ehartree_rho_cstr*dvol
-      CALL pw_grid%para%group%sum(ehartree_rho)
-      CALL pw_grid%para%group%sum(ehartree_rho_cstr)
-      electric_enthalpy = ehartree_rho + ehartree_rho_cstr
-      ehartree = ehartree_rho - ehartree_rho_cstr
-
-      CALL timestop(handle)
-
-   END SUBROUTINE compute_ehartree_mixed_bc_pw
+   END SUBROUTINE compute_ehartree_mixed_bc
 
 ! **************************************************************************************************
 !> \brief  Computes the (normalized) preconditioned residual norm error and the
@@ -2505,8 +2033,8 @@ CONTAINS
 !>       07.2014 created [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE ps_implicit_compute_error_fft_r3d(pw_pool, green, res_new, v_old, v_new, &
-                                                QAinvxres_new, pres_error, nabs_error)
+   SUBROUTINE ps_implicit_compute_error_fft(pw_pool, green, res_new, v_old, v_new, &
+                                            QAinvxres_new, pres_error, nabs_error)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
@@ -2514,7 +2042,7 @@ CONTAINS
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: QAinvxres_new
       REAL(dp), INTENT(OUT)                              :: pres_error, nabs_error
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_error_fft_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_error_fft'
 
       INTEGER                                            :: handle
       REAL(dp)                                           :: vol
@@ -2524,7 +2052,7 @@ CONTAINS
       vol = pw_pool%pw_grid%vol
 
 ! evaluate \Delta^-1(res) = \Delta^-1 (g - \Delta(v_new) - P(v_new) + Bt \lambda)
-      CALL apply_inv_laplace_operator_fft_r3d(pw_pool, green, res_new, QAinvxres_new)
+      CALL apply_inv_laplace_operator_fft(pw_pool, green, res_new, QAinvxres_new)
 ! (normalized) preconditioned residual norm error :
       pres_error = accurate_sum(QAinvxres_new%array(:, :, :)**2)
       CALL pw_pool%pw_grid%para%group%sum(pres_error)
@@ -2538,57 +2066,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE ps_implicit_compute_error_fft_r3d
-
-! **************************************************************************************************
-!> \brief  Computes the (normalized) preconditioned residual norm error and the
-!>         normalized absolute error
-!> \param pw_pool pool of the original plane-wave grid
-!> \param green greens functions for FFT based inverse Laplacian
-!> \param res_new residual
-!> \param v_old old v
-!> \param v_new new v
-!> \param QAinvxres_new Delta^-1(res_new)
-!> \param pres_error preconditioned residual norm error
-!> \param nabs_error normalized absolute error
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE ps_implicit_compute_error_fft_pw(pw_pool, green, res_new, v_old, v_new, &
-                                               QAinvxres_new, pres_error, nabs_error)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(pw_type), INTENT(IN)                          :: res_new, v_old, v_new
-      TYPE(pw_type), INTENT(INOUT)                       :: QAinvxres_new
-      REAL(dp), INTENT(OUT)                              :: pres_error, nabs_error
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_error_fft_pw'
-
-      INTEGER                                            :: handle
-      REAL(dp)                                           :: vol
-
-      CALL timeset(routineN, handle)
-
-      vol = pw_pool%pw_grid%vol
-
-! evaluate \Delta^-1(res) = \Delta^-1 (g - \Delta(v_new) - P(v_new) + Bt \lambda)
-      CALL apply_inv_laplace_operator_fft_pw(pw_pool, green, res_new, QAinvxres_new)
-! (normalized) preconditioned residual norm error :
-      pres_error = accurate_sum(QAinvxres_new%cr3d(:, :, :)**2)
-      CALL pw_pool%pw_grid%para%group%sum(pres_error)
-      pres_error = SQRT(pres_error)/vol
-
-! normalized absolute error :
-! nabs_error := \frac{\| v_old - v_new \|}{volume}
-      nabs_error = accurate_sum(ABS(v_old%cr3d - v_new%cr3d)**2)
-      CALL pw_pool%pw_grid%para%group%sum(nabs_error)
-      nabs_error = SQRT(nabs_error)/vol
-
-      CALL timestop(handle)
-
-   END SUBROUTINE ps_implicit_compute_error_fft_pw
+   END SUBROUTINE ps_implicit_compute_error_fft
 
 ! **************************************************************************************************
 !> \brief  Computes the (normalized) preconditioned residual norm error and the
@@ -2606,8 +2084,8 @@ CONTAINS
 !>       11.2015 revised [Hossein Bani-Hashemian]
 !> \author Mohammad Hossein Bani-Hashemian
 ! **************************************************************************************************
-   SUBROUTINE ps_implicit_compute_error_dct_r3d(pw_pool, green, res_new, v_old, v_new, &
-                                                QAinvxres_new, pres_error, nabs_error)
+   SUBROUTINE ps_implicit_compute_error_dct(pw_pool, green, res_new, v_old, v_new, &
+                                            QAinvxres_new, pres_error, nabs_error)
 
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(greens_fn_type), INTENT(IN)                   :: green
@@ -2615,7 +2093,7 @@ CONTAINS
       TYPE(pw_r3d_type), INTENT(INOUT)                   :: QAinvxres_new
       REAL(dp), INTENT(OUT)                              :: pres_error, nabs_error
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_error_dct_r3d'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_error_dct'
 
       INTEGER                                            :: handle
       REAL(dp)                                           :: vol
@@ -2625,7 +2103,7 @@ CONTAINS
       vol = pw_pool%pw_grid%vol
 
 ! evaluate \Delta^-1(res) = \Delta^-1 (g - \Delta(v_new) - P(v_new) + Bt \lambda)
-      CALL apply_inv_laplace_operator_dct_r3d(pw_pool, green, res_new, QAinvxres_new)
+      CALL apply_inv_laplace_operator_dct(pw_pool, green, res_new, QAinvxres_new)
 ! (normalized) preconditioned residual norm error :
       pres_error = accurate_sum(QAinvxres_new%array(:, :, :)**2)
       CALL pw_pool%pw_grid%para%group%sum(pres_error)
@@ -2639,58 +2117,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE ps_implicit_compute_error_dct_r3d
-
-! **************************************************************************************************
-!> \brief  Computes the (normalized) preconditioned residual norm error and the
-!>         normalized absolute error
-!> \param pw_pool pool of the original plane-wave grid
-!> \param green the greens_fn_type data holding a valid dct_influence_fn
-!> \param res_new residual
-!> \param v_old old v
-!> \param v_new new v
-!> \param QAinvxres_new Delta^-1(res_new)
-!> \param pres_error preconditioned residual norm error
-!> \param nabs_error normalized absolute error
-!> \par History
-!>       07.2014 created [Hossein Bani-Hashemian]
-!>       11.2015 revised [Hossein Bani-Hashemian]
-!> \author Mohammad Hossein Bani-Hashemian
-! **************************************************************************************************
-   SUBROUTINE ps_implicit_compute_error_dct_pw(pw_pool, green, res_new, v_old, v_new, &
-                                               QAinvxres_new, pres_error, nabs_error)
-
-      TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
-      TYPE(greens_fn_type), INTENT(IN)                   :: green
-      TYPE(pw_type), INTENT(IN)                          :: res_new, v_old, v_new
-      TYPE(pw_type), INTENT(INOUT)                       :: QAinvxres_new
-      REAL(dp), INTENT(OUT)                              :: pres_error, nabs_error
-
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'ps_implicit_compute_error_dct_pw'
-
-      INTEGER                                            :: handle
-      REAL(dp)                                           :: vol
-
-      CALL timeset(routineN, handle)
-
-      vol = pw_pool%pw_grid%vol
-
-! evaluate \Delta^-1(res) = \Delta^-1 (g - \Delta(v_new) - P(v_new) + Bt \lambda)
-      CALL apply_inv_laplace_operator_dct_pw(pw_pool, green, res_new, QAinvxres_new)
-! (normalized) preconditioned residual norm error :
-      pres_error = accurate_sum(QAinvxres_new%cr3d(:, :, :)**2)
-      CALL pw_pool%pw_grid%para%group%sum(pres_error)
-      pres_error = SQRT(pres_error)/vol
-
-! normalized absolute error :
-! nabs_error := \frac{\| v_old - v_new \|}{volume}
-      nabs_error = accurate_sum(ABS(v_old%cr3d - v_new%cr3d)**2)
-      CALL pw_pool%pw_grid%para%group%sum(nabs_error)
-      nabs_error = SQRT(nabs_error)/vol
-
-      CALL timestop(handle)
-
-   END SUBROUTINE ps_implicit_compute_error_dct_pw
+   END SUBROUTINE ps_implicit_compute_error_dct
 
 ! **************************************************************************************************
 !> \brief  output of the implicit (iterative) Poisson solver

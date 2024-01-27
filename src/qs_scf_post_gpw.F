@@ -124,6 +124,7 @@ MODULE qs_scf_post_gpw
                                               REALSPACE,&
                                               RECIPROCALSPACE,&
                                               pw_c1d_type,&
+                                              pw_r3d_type,&
                                               pw_type
    USE qs_chargemol,                    ONLY: write_wfx
    USE qs_collocate_density,            ONLY: calculate_wavefunction
@@ -3071,7 +3072,7 @@ CONTAINS
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
-      TYPE(pw_type)                                      :: aux_r
+      TYPE(pw_r3d_type)                                  :: aux_r
       TYPE(pw_type), POINTER                             :: dirichlet_tile
       TYPE(qs_subsys_type), POINTER                      :: subsys
       TYPE(section_vals_type), POINTER                   :: dft_section
@@ -3103,7 +3104,7 @@ CONTAINS
                                         extension=".cube", middle_name="DIELECTRIC_CONSTANT", file_position=my_pos_cube, &
                                         mpi_io=mpi_io)
          CALL pw_env_get(pw_env, poisson_env=poisson_env, auxbas_pw_pool=auxbas_pw_pool)
-         CALL auxbas_pw_pool%create_pw(aux_r, use_data=REALDATA3D, in_space=REALSPACE)
+         CALL auxbas_pw_pool%create_pw(aux_r, in_space=REALSPACE)
 
          boundary_condition = pw_env%poisson_env%parameters%ps_implicit_params%boundary_condition
          SELECT CASE (boundary_condition)
@@ -3151,7 +3152,7 @@ CONTAINS
                                         extension=".cube", middle_name="dirichlet_cstr_charge", file_position=my_pos_cube, &
                                         mpi_io=mpi_io)
          CALL pw_env_get(pw_env, poisson_env=poisson_env, auxbas_pw_pool=auxbas_pw_pool)
-         CALL auxbas_pw_pool%create_pw(aux_r, use_data=REALDATA3D, in_space=REALSPACE)
+         CALL auxbas_pw_pool%create_pw(aux_r, in_space=REALSPACE)
 
          boundary_condition = pw_env%poisson_env%parameters%ps_implicit_params%boundary_condition
          SELECT CASE (boundary_condition)
@@ -3194,7 +3195,7 @@ CONTAINS
          tile_cubes = section_get_lval(input, "DFT%PRINT%IMPLICIT_PSOLVER%DIRICHLET_BC_CUBE%TILE_CUBES")
 
          CALL pw_env_get(pw_env, poisson_env=poisson_env, auxbas_pw_pool=auxbas_pw_pool)
-         CALL auxbas_pw_pool%create_pw(aux_r, use_data=REALDATA3D, in_space=REALSPACE)
+         CALL auxbas_pw_pool%create_pw(aux_r, in_space=REALSPACE)
          CALL pw_zero(aux_r)
 
          IF (tile_cubes) THEN
