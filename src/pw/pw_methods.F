@@ -317,6 +317,19 @@ CONTAINS
          #:endif
          LOGICAL                                            :: my_allow_noncompatible_grids
          REAL(KIND=dp)                                      :: my_alpha, my_beta
+         #:if kind[1]=="3"
+            TYPE(pw_r3d_type) :: pw2_r3d
+
+            IF (pw2%in_use == REALDATA3D) THEN
+               pw2_r3d%in_space = pw2%in_space
+               pw2_r3d%pw_grid => pw2%pw_grid
+               pw2_r3d%array => pw2%cr3d
+               CALL pw_axpy_${kind}$_r3d(pw1, pw2_r3d, alpha, beta, allow_noncompatible_grids)
+               RETURN
+            ELSE
+               CPABORT("")
+            END IF
+         #:endif
 
          CALL timeset(routineN, handle)
 
@@ -345,18 +358,6 @@ CONTAINS
                   ELSE IF (my_alpha /= 0.0_dp) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw2,my_alpha,pw1)
                      pw2%cc = pw2%cc + my_alpha*pw1%array
-!$OMP END PARALLEL WORKSHARE
-                  END IF
-               #:endif
-               #:if kind=="r3d"
-                  ELSE IF (pw2%in_use == REALDATA3D) THEN
-                  IF (my_alpha == 1.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                     pw2%cr3d = pw2%cr3d + pw1%array
-!$OMP END PARALLEL WORKSHARE
-                  ELSE IF (my_alpha /= 0.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, my_alpha)
-                     pw2%cr3d = pw2%cr3d + my_alpha*pw1%array
 !$OMP END PARALLEL WORKSHARE
                   END IF
                #:endif
@@ -476,24 +477,6 @@ CONTAINS
 
                   END IF
                #:endif
-               #:if kind=="r3d"
-                  ELSE IF (pw2%in_use == REALDATA3D .AND. &
-                           pw1%in_space == REALSPACE .AND. &
-                           pw2%in_space == REALSPACE) THEN
-
-                  IF (ANY(SHAPE(pw1%array) /= SHAPE(pw2%cr3d))) &
-                     CPABORT("Noncommensurate grids not implemented for real-valued grids!")
-
-                  IF (my_alpha == 1.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                     pw2%cr3d(:, :, :) = pw2%cr3d(:, :, :) + pw1%array(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-                  ELSE
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2,my_alpha)
-                     pw2%cr3d(:, :, :) = pw2%cr3d(:, :, :) + my_alpha*pw1%array(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-                  END IF
-               #:endif
             ELSE
                CPABORT("No suitable data field")
             END IF
@@ -550,6 +533,19 @@ CONTAINS
          #:endif
          LOGICAL                                            :: my_allow_noncompatible_grids
          REAL(KIND=dp)                                      :: my_alpha, my_beta
+         #:if kind[1]=="3"
+            TYPE(pw_r3d_type) :: pw1_r3d
+
+            IF (pw1%in_use == REALDATA3D) THEN
+               pw1_r3d%in_space = pw1%in_space
+               pw1_r3d%pw_grid => pw1%pw_grid
+               pw1_r3d%array => pw1%cr3d
+               CALL pw_axpy_r3d_${kind}$ (pw1_r3d, pw2, alpha, beta, allow_noncompatible_grids)
+               RETURN
+            ELSE
+               CPABORT("")
+            END IF
+         #:endif
 
          CALL timeset(routineN, handle)
 
@@ -577,18 +573,6 @@ CONTAINS
                   ELSE IF (my_alpha /= 0.0_dp) THEN
 !$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw2,my_alpha,pw1)
                      pw2%array = pw2%array + my_alpha*pw1%cc
-!$OMP END PARALLEL WORKSHARE
-                  END IF
-               #:endif
-               #:if kind=="r3d"
-                  ELSE IF (pw1%in_use == REALDATA3D) THEN
-                  IF (my_alpha == 1.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
-                     pw2%array = pw2%array + pw1%cr3d
-!$OMP END PARALLEL WORKSHARE
-                  ELSE IF (my_alpha /= 0.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, my_alpha)
-                     pw2%array = pw2%array + my_alpha*pw1%cr3d
 !$OMP END PARALLEL WORKSHARE
                   END IF
                #:endif
@@ -707,24 +691,6 @@ CONTAINS
                      END IF
                      CPABORT("Grids not compatible")
 
-                  END IF
-               #:endif
-               #:if kind=="r3d"
-                  ELSE IF (pw1%in_use == REALDATA3D .AND. &
-                           pw1%in_space == REALSPACE .AND. &
-                           pw2%in_space == REALSPACE) THEN
-
-                  IF (ANY(SHAPE(pw1%cr3d) /= SHAPE(pw2%array))) &
-                     CPABORT("Noncommensurate grids not implemented for real-valued grids!")
-
-                  IF (my_alpha == 1.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                     pw2%array(:, :, :) = pw2%array(:, :, :) + pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-                  ELSE
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2,my_alpha)
-                     pw2%array(:, :, :) = pw2%array(:, :, :) + my_alpha*pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
                   END IF
                #:endif
             ELSE
@@ -4334,6 +4300,15 @@ CONTAINS
                            INTEGER                                            :: handle, i, j, ng, ng1, ng2, out_unit
                            LOGICAL                                            :: my_allow_noncompatible_grids
                            REAL(KIND=dp)                                      :: my_alpha, my_beta
+                           TYPE(pw_r3d_type) :: pw1_r3d
+
+                           IF (pw1%in_use == REALDATA3D) THEN
+                              pw1_r3d%in_space = pw1%in_space
+                              pw1_r3d%pw_grid => pw1%pw_grid
+                              pw1_r3d%array => pw1%cr3d
+                              CALL pw_axpy_r3d_pw(pw1_r3d, pw2, alpha, beta, allow_noncompatible_grids)
+                              RETURN
+                           END IF
 
                            CALL timeset(routineN, handle)
 
@@ -4508,24 +4483,6 @@ CONTAINS
                                     END IF
                                     CPABORT("Grids not compatible")
 
-                                 END IF
-
-                              ELSE IF (pw1%in_use == REALDATA3D .AND. &
-                                       pw2%in_use == REALDATA3D) THEN
-
-                                 IF (ANY(SHAPE(pw1%cr3d) /= SHAPE(pw2%cr3d))) THEN
-                                    CALL cp_abort(__LOCATION__, &
-                                                  "Noncommensurate grids not implemented for real-valued grids!")
-                                 END IF
-
-                                 IF (my_alpha == 1.0_dp) THEN
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
-                                    pw2%cr3d(:, :, :) = pw2%cr3d(:, :, :) + pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
-                                 ELSE
-!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2,my_alpha)
-                                    pw2%cr3d(:, :, :) = pw2%cr3d(:, :, :) + my_alpha*pw1%cr3d(:, :, :)
-!$OMP END PARALLEL WORKSHARE
                                  END IF
                               ELSE
                                  CPABORT("No suitable data field")
