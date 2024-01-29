@@ -42,8 +42,7 @@ MODULE qs_tddfpt2_types
    USE parallel_gemm_api,               ONLY: parallel_gemm
    USE pw_env_types,                    ONLY: pw_env_get
    USE pw_pool_types,                   ONLY: pw_pool_type
-   USE pw_types,                        ONLY: pw_c1d_gs_type,&
-                                              pw_r3d_rs_type
+   USE pw_types,                        ONLY: pw_r3d_rs_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_kind_types,                   ONLY: qs_kind_type
@@ -155,8 +154,6 @@ MODULE qs_tddfpt2_types
       TYPE(qs_rho_type), POINTER                         :: rho_aux_fit_struct_sub
       !> group-specific copy of a Coulomb/xc-potential on a real-space grid
       TYPE(pw_r3d_rs_type), DIMENSION(:), POINTER             :: A_ia_rspace_sub
-      !> group-specific copy of a reciprocal-space grid
-      TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER             :: wpw_gspace_sub
       !> group-specific copy of a real-space grid
       TYPE(pw_r3d_rs_type), DIMENSION(:), POINTER             :: wpw_rspace_sub
       !> group-specific copy of a real-space grid for the kinetic energy density
@@ -406,11 +403,10 @@ CONTAINS
       ! work plain-wave grids
       CALL pw_env_get(sub_env%pw_env, auxbas_pw_pool=auxbas_pw_pool)
       ALLOCATE (work_matrices%A_ia_rspace_sub(nspins))
-      ALLOCATE (work_matrices%wpw_gspace_sub(nspins), work_matrices%wpw_rspace_sub(nspins), &
+      ALLOCATE (work_matrices%wpw_rspace_sub(nspins), &
                 work_matrices%wpw_tau_rspace_sub(nspins))
       DO ispin = 1, nspins
          CALL auxbas_pw_pool%create_pw(work_matrices%A_ia_rspace_sub(ispin))
-         CALL auxbas_pw_pool%create_pw(work_matrices%wpw_gspace_sub(ispin))
          CALL auxbas_pw_pool%create_pw(work_matrices%wpw_rspace_sub(ispin))
          CALL auxbas_pw_pool%create_pw(work_matrices%wpw_tau_rspace_sub(ispin))
       END DO
@@ -622,7 +618,7 @@ CONTAINS
       NULLIFY (work_matrices%rho_orb_struct_sub)
       NULLIFY (work_matrices%hfx_fm_ao_ao, work_matrices%hfx_rho_ao_symm, work_matrices%hfx_hmat_symm, &
                work_matrices%hfx_rho_ao_asymm, work_matrices%hfx_hmat_asymm)
-      NULLIFY (work_matrices%A_ia_rspace_sub, work_matrices%wpw_gspace_sub, &
+      NULLIFY (work_matrices%A_ia_rspace_sub, &
                work_matrices%wpw_rspace_sub)
       NULLIFY (work_matrices%fxc_rspace_sub)
       NULLIFY (work_matrices%A_ia_munu_sub)
@@ -697,10 +693,9 @@ CONTAINS
          DO ispin = SIZE(work_matrices%wpw_rspace_sub), 1, -1
             CALL auxbas_pw_pool%give_back_pw(work_matrices%wpw_rspace_sub(ispin))
             CALL auxbas_pw_pool%give_back_pw(work_matrices%wpw_tau_rspace_sub(ispin))
-            CALL auxbas_pw_pool%give_back_pw(work_matrices%wpw_gspace_sub(ispin))
             CALL auxbas_pw_pool%give_back_pw(work_matrices%A_ia_rspace_sub(ispin))
          END DO
-         DEALLOCATE (work_matrices%A_ia_rspace_sub, work_matrices%wpw_gspace_sub, &
+         DEALLOCATE (work_matrices%A_ia_rspace_sub, &
                      work_matrices%wpw_rspace_sub, work_matrices%wpw_tau_rspace_sub)
          IF (ASSOCIATED(work_matrices%fxc_rspace_sub)) THEN
             DO ispin = SIZE(work_matrices%fxc_rspace_sub), 1, -1

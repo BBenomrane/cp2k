@@ -67,7 +67,6 @@ MODULE qs_resp
                                               pw_env_type
    USE pw_methods,                      ONLY: pw_copy,&
                                               pw_scale,&
-                                              pw_transfer,&
                                               pw_zero
    USE pw_poisson_methods,              ONLY: pw_poisson_solve
    USE pw_poisson_types,                ONLY: pw_poisson_type
@@ -919,7 +918,7 @@ CONTAINS
       REAL(KIND=dp)                                      :: normalize_factor
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:, :)        :: vpot
       TYPE(mp_para_env_type), POINTER                    :: para_env
-      TYPE(pw_c1d_gs_type)                               :: rho_ga, va_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_ga
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
@@ -942,7 +941,6 @@ CONTAINS
       CALL pw_env_get(pw_env, auxbas_pw_pool=auxbas_pw_pool, &
                       poisson_env=poisson_env)
       CALL auxbas_pw_pool%create_pw(rho_ga)
-      CALL auxbas_pw_pool%create_pw(va_gspace)
       CALL auxbas_pw_pool%create_pw(va_rspace)
 
       !get fitting points and store them in resp_env%fitpoints
@@ -956,10 +954,7 @@ CONTAINS
          CALL pw_zero(rho_ga)
          CALL calculate_rho_resp_single(rho_ga, qs_env, resp_env%eta, i)
          !calculate potential va and store the part needed for fitting in vpot
-         CALL pw_zero(va_gspace)
-         CALL pw_poisson_solve(poisson_env, rho_ga, vhartree=va_gspace)
-         CALL pw_zero(va_rspace)
-         CALL pw_transfer(va_gspace, va_rspace)
+         CALL pw_poisson_solve(poisson_env, rho_ga, vhartree=va_rspace)
          CALL pw_scale(va_rspace, normalize_factor)
          DO ip = 1, resp_env%npoints_proc
             jx = resp_env%fitpoints(1, ip)
@@ -969,7 +964,6 @@ CONTAINS
          END DO
       END DO
 
-      CALL va_gspace%release()
       CALL va_rspace%release()
       CALL rho_ga%release()
 
@@ -1681,7 +1675,7 @@ CONTAINS
                                                             sum_diff, sum_hartree, udvol
       TYPE(cp_logger_type), POINTER                      :: logger
       TYPE(mp_para_env_type), POINTER                    :: para_env
-      TYPE(pw_c1d_gs_type)                               :: rho_resp, v_resp_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_resp
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
@@ -1709,17 +1703,13 @@ CONTAINS
                       poisson_env=poisson_env)
 
       CALL auxbas_pw_pool%create_pw(rho_resp)
-      CALL auxbas_pw_pool%create_pw(v_resp_gspace)
       CALL auxbas_pw_pool%create_pw(v_resp_rspace)
 
       CALL pw_zero(rho_resp)
       CALL calculate_rho_resp_all(rho_resp, resp_env%rhs, natom, &
                                   resp_env%eta, qs_env)
-      CALL pw_zero(v_resp_gspace)
       CALL pw_poisson_solve(poisson_env, rho_resp, &
-                            vhartree=v_resp_gspace)
-      CALL pw_zero(v_resp_rspace)
-      CALL pw_transfer(v_resp_gspace, v_resp_rspace)
+                            vhartree=v_resp_rspace)
       dvol = v_resp_rspace%pw_grid%dvol
       CALL pw_scale(v_resp_rspace, dvol)
       CALL pw_scale(v_resp_rspace, -normalize_factor)
@@ -1728,7 +1718,6 @@ CONTAINS
       IF (resp_env%use_repeat_method) THEN
          v_resp_rspace%array(:, :, :) = v_resp_rspace%array(:, :, :) - resp_env%offset*dvol
       END IF
-      CALL v_resp_gspace%release()
       CALL rho_resp%release()
 
       !***now print the v_resp_rspace%pw to a cube file if requested

@@ -436,6 +436,7 @@ CONTAINS
             CALL cp2k_distribution_to_z_slices(rhor, poisson_env%wavelet, rhor%pw_grid)
             CALL ps_wavelet_solve(poisson_env%wavelet, rhor%pw_grid)
             CALL z_slices_to_cp2k_distribution(rhor, poisson_env%wavelet, rhor%pw_grid)
+            IF (PRESENT(ehartree) .OR. PRESENT(h_stress)) CALL pw_transfer(rhor, rhog)
             IF (PRESENT(ehartree)) THEN
                #:if kindd=="r3d_rs"
                   IF (PRESENT(aux_density)) THEN
@@ -443,20 +444,15 @@ CONTAINS
                   ELSE
                      ehartree = 0.5_dp*pw_integral_ab(density, rhor)
                   END IF
-                  IF (PRESENT(h_stress)) THEN
-                     CALL pw_pool%create_pw(rhog)
-                     CALL pw_transfer(rhor, rhog)
-                  END IF
-               #:else
-                  CALL pw_transfer(rhor, rhog)
+               #:elif kindd=="c1d_gs"
                   IF (PRESENT(aux_density)) THEN
                      ehartree = 0.5_dp*pw_integral_ab(aux_density, rhog)
                   ELSE
                      ehartree = 0.5_dp*pw_integral_ab(density, rhog)
                   END IF
+               #:else
+                  #:stop "Unknown kind: "+kindd
                #:endif
-            ELSE IF (PRESENT(h_stress)) THEN
-               CALL pw_transfer(rhor, rhog)
             END IF
 
             IF (PRESENT(h_stress) .AND. PRESENT(aux_density)) THEN
@@ -522,9 +518,11 @@ CONTAINS
             LOGICAL                                            :: has_dielectric
             TYPE(pw_grid_type), POINTER                        :: pw_grid
             TYPE(pw_pool_type), POINTER                        :: pw_pool
-            TYPE(pw_r3d_rs_type)                                      :: &
-               rhor, vhartree_rs
-            TYPE(pw_c1d_gs_type) :: influence_fn, rhog, rhog_aux
+            TYPE(pw_r3d_rs_type)                               :: rhor, vhartree_rs
+            TYPE(pw_c1d_gs_type)                               :: influence_fn, rhog, rhog_aux
+            #:if kindd=="c1d_gs" and kindv=="r3d_rs"
+               TYPE(pw_c1d_gs_type) :: tmpg
+            #:endif
 
             CALL timeset(routineN, handle)
 
@@ -637,6 +635,8 @@ CONTAINS
                      #:elif kindd=="c1d_gs"
                         CALL pw_transfer(aux_density, rhor)
                         ehartree = 0.5_dp*pw_integral_ab(rhor, vhartree_rs)
+                     #:else
+                        #:stop "Unknown kind: "+kindd
                      #:endif
                   END IF
 
@@ -665,18 +665,20 @@ CONTAINS
                         ehartree = 0.5_dp*pw_integral_ab(aux_density, rhor)
                      #:elif kindd=="c1d_gs" and kindv=="c1d_gs"
                         ehartree = 0.5_dp*pw_integral_ab(aux_density, vhartree)
-                     #:elif kindd=="c1d_gs" and kindv=="r3d_gs"
+                     #:elif kindd=="c1d_gs" and kindv=="r3d_rs"
                         CALL pw_pool%create_pw(tmpg)
                         CALL pw_transfer(vhartree, tmpg)
                         ehartree = 0.5_dp*pw_integral_ab(aux_density, tmpg)
                         CALL pw_pool%give_back_pw(tmpg)
+                     #:else
+                        #:stop "Unknown kind: "+kindd
                      #:endif
                   ELSE
                      #:if kindd=="r3d_rs"
                         ehartree = 0.5_dp*pw_integral_ab(density, rhor)
                      #:elif kindd=="c1d_gs" and kindv=="c1d_gs"
                         ehartree = 0.5_dp*pw_integral_ab(density, vhartree)
-                     #:elif kindd=="c1d_gs" and kindv=="r3d_gs"
+                     #:elif kindd=="c1d_gs" and kindv=="r3d_rs"
                         CALL pw_pool%create_pw(tmpg)
                         CALL pw_transfer(vhartree, tmpg)
                         ehartree = 0.5_dp*pw_integral_ab(density, tmpg)
@@ -1001,20 +1003,24 @@ CONTAINS
                         IF (PRESENT(aux_density)) THEN
                            #:if kindd==kindv
                               ehartree = 0.5_dp*pw_integral_ab(aux_density, vhartree)
-                           #:elif kindd=="c1d_gs"
+                           #:elif kindd=="c1d_gs" and kindv=="r3d_rs"
                               ehartree = 0.5_dp*pw_integral_ab(aux_density, rhog)
-                           #:else
+                           #:elif kindd=="r3d_rs" and kindv=="c1d_gs"
                               CALL pw_transfer(aux_density, tmpg)
-                              ehartree = 0.5_dp*pw_integral_ab(rhog, vhartree)
+                              ehartree = 0.5_dp*pw_integral_ab(tmpg, vhartree)
+                           #:else
+                              #:stop "Unknown combination of kinds: "+kindd+"/"+kindv
                            #:endif
                         ELSE
                            #:if kindd==kindv
                               ehartree = 0.5_dp*pw_integral_ab(density, vhartree)
-                           #:elif kindd=="c1d_gs"
+                           #:elif kindd=="c1d_gs" and kindv=="r3d_rs"
                               ehartree = 0.5_dp*pw_integral_ab(density, rhog)
-                           #:else
+                           #:elif kindd=="r3d_rs" and kindv=="c1d_gs"
                               CALL pw_transfer(density, tmpg)
-                              ehartree = 0.5_dp*pw_integral_ab(rhog, vhartree)
+                              ehartree = 0.5_dp*pw_integral_ab(tmpg, vhartree)
+                           #:else
+                              #:stop "Unknown combination of kinds: "+kindd+"/"+kindv
                            #:endif
                         END IF
                         CALL pw_pool%give_back_pw(tmpg)
@@ -1104,6 +1110,8 @@ CONTAINS
                            ehartree = 0.5_dp*pw_integral_ab(aux_density, rhor)
                         #:elif kindd=="c1d_gs"
                            ehartree = 0.5_dp*pw_integral_ab(aux_density, rhog_aux)
+                        #:else
+                           #:stop "Unknown density kind: "+kindd
                         #:endif
                      END IF
                   ELSE IF (PRESENT(ehartree)) THEN
@@ -1111,6 +1119,8 @@ CONTAINS
                         ehartree = 0.5_dp*pw_integral_ab(density, rhor)
                      #:elif kindd=="c1d_gs"
                         ehartree = 0.5_dp*pw_integral_ab(density, rhog)
+                     #:else
+                        #:stop "Unknown density kind: "+kindd
                      #:endif
                   END IF
                   CALL pw_pool%give_back_pw(rhor)

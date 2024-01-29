@@ -107,7 +107,7 @@ CONTAINS
       TYPE(admm_type), POINTER                           :: admm_env
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(mp_para_env_type), POINTER                    :: para_env
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, v_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace
       TYPE(pw_c1d_gs_type), POINTER                      :: rho_core
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_grid_type), POINTER                        :: pw_grid
@@ -140,7 +140,6 @@ CONTAINS
                       poisson_env=poisson_env)
 
       ! Calculate the Hartree potential
-      CALL auxbas_pw_pool%create_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%create_pw(v_hartree_rspace)
       CALL auxbas_pw_pool%create_pw(rho_tot_gspace)
 
@@ -148,11 +147,9 @@ CONTAINS
       CALL calc_rho_tot_gspace(rho_tot_gspace, qs_env, rho)
 
       CALL pw_poisson_solve(poisson_env, rho_tot_gspace, ehartree, &
-                            v_hartree_gspace, h_stress=h_stress, rho_core=rho_core)
-      CALL pw_transfer(v_hartree_gspace, v_hartree_rspace)
+                            v_hartree_rspace, h_stress=h_stress, rho_core=rho_core)
       CALL pw_scale(v_hartree_rspace, v_hartree_rspace%pw_grid%dvol)
 
-      CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%give_back_pw(rho_tot_gspace)
       !
       CALL calculate_ecore_self(qs_env, E_self_core=eself)

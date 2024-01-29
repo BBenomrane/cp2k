@@ -32,7 +32,6 @@ MODULE qs_tddfpt2_operators
    USE pw_methods,                      ONLY: pw_axpy,&
                                               pw_multiply,&
                                               pw_scale,&
-                                              pw_transfer,&
                                               pw_zero
    USE pw_poisson_methods,              ONLY: pw_poisson_solve
    USE pw_poisson_types,                ONLY: pw_poisson_type
@@ -146,7 +145,6 @@ CONTAINS
 !> \param qs_env ...
 !> \param sub_env        the full sub_environment needed for calculation
 !> \param gapw           Flag indicating GAPW cacluation
-!> \param work_v_gspace  work reciprocal-space grid to store Coulomb potential (modified on exit)
 !> \param work_v_rspace  work real-space grid to store Coulomb potential (modified on exit)
 !> \par History
 !>    * 05.2016 compute all coulomb terms in one go [Sergey Chulkov]
@@ -158,7 +156,7 @@ CONTAINS
 !>       Mohamed Fawzi on 10.2002.
 ! **************************************************************************************************
    SUBROUTINE tddfpt_apply_coulomb(A_ia_rspace, rho_ia_g, local_rho_set, hartree_local, &
-                                   qs_env, sub_env, gapw, work_v_gspace, work_v_rspace)
+                                   qs_env, sub_env, gapw, work_v_rspace)
       TYPE(pw_r3d_rs_type), DIMENSION(:), INTENT(INOUT)  :: A_ia_rspace
       TYPE(pw_c1d_gs_type), INTENT(INOUT)                :: rho_ia_g
       TYPE(local_rho_type), POINTER                      :: local_rho_set
@@ -166,7 +164,6 @@ CONTAINS
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(tddfpt_subgroup_env_type), INTENT(in)         :: sub_env
       LOGICAL, INTENT(IN)                                :: gapw
-      TYPE(pw_c1d_gs_type), INTENT(INOUT)                :: work_v_gspace
       TYPE(pw_r3d_rs_type), INTENT(INOUT)                :: work_v_rspace
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'tddfpt_apply_coulomb'
@@ -195,8 +192,7 @@ CONTAINS
          CALL pw_axpy(local_rho_set%rho0_mpole%rho0_s_gs, rho_ia_g)
       END IF
 
-      CALL pw_poisson_solve(poisson_env, rho_ia_g, pair_energy, work_v_gspace)
-      CALL pw_transfer(work_v_gspace, work_v_rspace)
+      CALL pw_poisson_solve(poisson_env, rho_ia_g, pair_energy, work_v_rspace)
 
       ! (i a || j b) = ( i_alpha a_alpha + i_beta a_beta || j_alpha b_alpha + j_beta b_beta) =
       !                tr (Cj_alpha^T * [J_i{alpha}a{alpha}_munu + J_i{beta}a{beta}_munu] * Cb_alpha) +

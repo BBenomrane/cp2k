@@ -46,7 +46,6 @@ MODULE ec_orth_solver
                                               pw_env_type
    USE pw_methods,                      ONLY: pw_axpy,&
                                               pw_scale,&
-                                              pw_transfer,&
                                               pw_zero
    USE pw_poisson_methods,              ONLY: pw_poisson_solve
    USE pw_poisson_types,                ONLY: pw_poisson_type
@@ -1131,7 +1130,7 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_G, matrix_s, rho1_ao, rho_ao
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(mp_para_env_type), POINTER                    :: para_env
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, v_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rho1_g
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
@@ -1177,7 +1176,6 @@ CONTAINS
                       poisson_env=poisson_env)
 
       ! Calculate the NSC Hartree potential
-      CALL auxbas_pw_pool%create_pw(pw=v_hartree_gspace)
       CALL auxbas_pw_pool%create_pw(pw=rho_tot_gspace)
       CALL auxbas_pw_pool%create_pw(pw=v_hartree_rspace)
 
@@ -1230,8 +1228,7 @@ CONTAINS
 
       ! get Hartree potential from rho_tot_gspace
       CALL pw_poisson_solve(poisson_env, rho_tot_gspace, &
-                            vhartree=v_hartree_gspace)
-      CALL pw_transfer(v_hartree_gspace, v_hartree_rspace)
+                            vhartree=v_hartree_rspace)
       CALL pw_scale(v_hartree_rspace, v_hartree_rspace%pw_grid%dvol)
 
       ! Add v_xc + v_H
@@ -1308,7 +1305,6 @@ CONTAINS
       CALL commutator(matrix_G, matrix_p, matrix_Ax, eps_filter, .FALSE., 1.0_dp, 1.0_dp)
 
       ! release pw grids
-      CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%give_back_pw(v_hartree_rspace)
       CALL auxbas_pw_pool%give_back_pw(rho_tot_gspace)
       DO ispin = 1, nspins

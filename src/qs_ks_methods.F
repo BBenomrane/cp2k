@@ -354,8 +354,7 @@ CONTAINS
           (.NOT. (poisson_env%parameters%solver .EQ. pw_poisson_implicit))) THEN
          CALL pw_zero(rho_tot_gspace)
          CALL calc_rho_tot_gspace(rho_tot_gspace, qs_env, rho, skip_nuclear_density=.TRUE.)
-         CALL pw_poisson_solve(poisson_env, rho_tot_gspace, energy%e_hartree, &
-                               v_hartree_gspace)
+         CALL pw_poisson_solve(poisson_env, rho_tot_gspace, energy%e_hartree)
          CALL pw_zero(rho_tot_gspace)
          CALL pw_zero(v_hartree_gspace)
       END IF

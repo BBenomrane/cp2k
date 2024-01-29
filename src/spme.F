@@ -627,17 +627,17 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(3)                        :: fat
       TYPE(greens_fn_type), POINTER                      :: green
       TYPE(mp_comm_type)                                 :: group
+      TYPE(pw_c1d_gs_type)                               :: rhob_g
       TYPE(pw_c1d_gs_type), DIMENSION(3)                 :: dphi_g
-      TYPE(pw_c1d_gs_type), POINTER                      :: phi_g, rhob_g
       TYPE(pw_grid_type), POINTER                        :: grid_spme
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: pw_pool
-      TYPE(pw_r3d_rs_type), POINTER                      :: rhob_r
+      TYPE(pw_r3d_rs_type)                               :: rhob_r
       TYPE(realspace_grid_desc_type), POINTER            :: rs_desc
       TYPE(realspace_grid_type), DIMENSION(3)            :: drpot
       TYPE(realspace_grid_type), POINTER                 :: rden
 
-      NULLIFY (grid_spme, green, poisson_env, phi_g, rhob_g, rhob_r, &
+      NULLIFY (grid_spme, green, poisson_env, &
                pw_pool, rden)
       CALL timeset(routineN, handle)
       CALL cite_reference(Essmann1995)
@@ -680,13 +680,9 @@ CONTAINS
       DEALLOCATE (center, delta)
       !----------- END OF DENSITY CALCULATION -------------
 
-      NULLIFY (rhob_r)
-      ALLOCATE (rhob_r)
       CALL pw_pool%create_pw(rhob_r)
       CALL transfer_rs2pw(rden, rhob_r)
       ! transform density to G space and add charge function
-      NULLIFY (rhob_g)
-      ALLOCATE (rhob_g)
       CALL pw_pool%create_pw(rhob_g)
       CALL pw_transfer(rhob_r, rhob_g)
       ! update charge function
@@ -697,10 +693,7 @@ CONTAINS
       DO i = 1, 3
          CALL pw_pool%create_pw(dphi_g(i))
       END DO
-      NULLIFY (phi_g)
-      ALLOCATE (phi_g)
-      CALL pw_pool%create_pw(phi_g)
-      CALL pw_poisson_solve(poisson_env, density=rhob_g, vhartree=phi_g, &
+      CALL pw_poisson_solve(poisson_env, density=rhob_g, &
                             dvhartree=dphi_g)
       !---------- END OF ELECTROSTATIC CALCULATION --------
       ! move derivative of potential to real space grid and
@@ -733,10 +726,6 @@ CONTAINS
       DO i = 1, 3
          CALL rs_grid_release(drpot(i))
       END DO
-      CALL pw_pool%give_back_pw(phi_g)
-      CALL pw_pool%give_back_pw(rhob_g)
-      CALL pw_pool%give_back_pw(rhob_r)
-      DEALLOCATE (phi_g, rhob_g, rhob_r)
       CALL rs_grid_release(rden)
       DEALLOCATE (rden)
 

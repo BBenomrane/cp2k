@@ -702,7 +702,7 @@ CONTAINS
       INTEGER                                            :: handle, iatom, iatom_ref, natom
       REAL(KIND=dp), DIMENSION(:), POINTER               :: int_res
       TYPE(mp_para_env_type), POINTER                    :: para_env
-      TYPE(pw_c1d_gs_type)                               :: rho_gb, vb_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_gb
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
@@ -721,7 +721,6 @@ CONTAINS
       CALL pw_env_get(pw_env, auxbas_pw_pool=auxbas_pw_pool, &
                       poisson_env=poisson_env)
       CALL auxbas_pw_pool%create_pw(rho_gb)
-      CALL auxbas_pw_pool%create_pw(vb_gspace)
       CALL auxbas_pw_pool%create_pw(vb_rspace)
 
       ! calculate vb only once for one reference atom
@@ -730,10 +729,7 @@ CONTAINS
       CALL pw_zero(rho_gb)
       CALL calculate_rho_single_gaussian(rho_gb, qs_env, iatom_ref)
       !calculate potential vb like hartree potential
-      CALL pw_zero(vb_gspace)
-      CALL pw_poisson_solve(poisson_env, rho_gb, vhartree=vb_gspace)
-      CALL pw_zero(vb_rspace)
-      CALL pw_transfer(vb_gspace, vb_rspace)
+      CALL pw_poisson_solve(poisson_env, rho_gb, vhartree=vb_rspace)
       CALL pw_scale(vb_rspace, vb_rspace%pw_grid%dvol)
 
       DO iatom = 1, natom
@@ -746,7 +742,6 @@ CONTAINS
          image_matrix(iatom + 1:natom, iatom) = int_res(iatom + 1:natom)
       END DO
 
-      CALL vb_gspace%release()
       CALL vb_rspace%release()
       CALL rho_gb%release()
 

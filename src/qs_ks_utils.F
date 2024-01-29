@@ -1722,11 +1722,9 @@ CONTAINS
       ELSE
          BLOCK
             REAL(KIND=dp)                                      :: factor
-            TYPE(pw_c1d_gs_type) :: rho_eff_gspace, v_xc_gspace
+            TYPE(pw_c1d_gs_type) :: rho_eff_gspace
             CALL auxbas_pw_pool%create_pw(pw=rho_eff_gspace)
-            CALL auxbas_pw_pool%create_pw(pw=v_xc_gspace)
             CALL pw_zero(rho_eff_gspace)
-            CALL pw_zero(v_xc_gspace)
             CALL pw_zero(v_xc_rspace)
             factor = pw_integrate_function(rho_g(1))
             CALL qs_rho_get(qs_env%rho_external, &
@@ -1746,8 +1744,7 @@ CONTAINS
             factor = -1.0_dp/nelectron
             CALL pw_axpy(rho_g(1), rho_eff_gspace, alpha=factor)
 
-            CALL pw_poisson_solve(poisson_env, rho_eff_gspace, vhartree=v_xc_gspace)
-            CALL pw_transfer(v_xc_gspace, v_rspace_new(1))
+            CALL pw_poisson_solve(poisson_env, rho_eff_gspace, vhartree=v_rspace_new(1))
             CALL pw_copy(v_rspace_new(1), v_xc_rspace)
 
             exc = 0.0_dp
@@ -1757,7 +1754,6 @@ CONTAINS
 !Vxc---> v_rspace_new
 !Exc---> energy%exc
             CALL auxbas_pw_pool%give_back_pw(rho_eff_gspace)
-            CALL auxbas_pw_pool%give_back_pw(v_xc_gspace)
          END BLOCK
       END IF
 

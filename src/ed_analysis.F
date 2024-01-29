@@ -60,13 +60,11 @@ MODULE ed_analysis
    USE pw_env_types,                    ONLY: pw_env_get,&
                                               pw_env_type
    USE pw_methods,                      ONLY: pw_axpy,&
-                                              pw_scale,&
-                                              pw_transfer
+                                              pw_scale
    USE pw_poisson_methods,              ONLY: pw_poisson_solve
    USE pw_poisson_types,                ONLY: pw_poisson_type
    USE pw_pool_types,                   ONLY: pw_pool_type
-   USE pw_types,                        ONLY: pw_c1d_gs_type,&
-                                              pw_r3d_rs_type
+   USE pw_types,                        ONLY: pw_r3d_rs_type
    USE qs_collocate_density,            ONLY: calculate_rho_core
    USE qs_core_energies,                ONLY: calculate_ecore_alpha,&
                                               calculate_ecore_overlap,&
@@ -910,7 +908,6 @@ CONTAINS
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: sab_orb, sac_ae
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_ewd_g, v_hewd_gspace
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
@@ -937,9 +934,7 @@ CONTAINS
       CALL pw_env_get(pw_env, auxbas_pw_pool=auxbas_pw_pool, &
                       poisson_env=poisson_env)
       !
-      CALL auxbas_pw_pool%create_pw(v_hewd_gspace)
       CALL auxbas_pw_pool%create_pw(v_hewd_rspace)
-      CALL auxbas_pw_pool%create_pw(rho_tot_ewd_g)
       CALL auxbas_pw_pool%create_pw(rho_tot_ewd_r)
       rhotot = 0.0_dp
       CALL calculate_rho_core(rho_tot_ewd_r, rhotot, qs_env, calpha=alpha, ccore=ccore)
@@ -949,10 +944,8 @@ CONTAINS
       DO ispin = 1, dft_control%nspins
          CALL pw_axpy(rho_r(ispin), rho_tot_ewd_r)
       END DO
-      CALL pw_transfer(rho_tot_ewd_r, rho_tot_ewd_g)
       !
-      CALL pw_poisson_solve(poisson_env, density=rho_tot_ewd_g, vhartree=v_hewd_gspace)
-      CALL pw_transfer(v_hewd_gspace, v_hewd_rspace)
+      CALL pw_poisson_solve(poisson_env, density=rho_tot_ewd_r, vhartree=v_hewd_rspace)
       CALL pw_scale(v_hewd_rspace, v_hewd_rspace%pw_grid%dvol)
       atecc = 0.0_dp
       CALL integrate_v_gaussian_rspace(v_hewd_rspace, qs_env, alpha, ccore, atecc)
@@ -985,9 +978,7 @@ CONTAINS
                       alpha, ccore, eps_core_charge, sab_orb, sac_ae)
       CALL dbcsr_scale(vh_mat%matrix, -1.0_dp)
       !
-      CALL auxbas_pw_pool%give_back_pw(v_hewd_gspace)
       CALL auxbas_pw_pool%give_back_pw(v_hewd_rspace)
-      CALL auxbas_pw_pool%give_back_pw(rho_tot_ewd_g)
       CALL auxbas_pw_pool%give_back_pw(rho_tot_ewd_r)
       DEALLOCATE (atecc)
       DEALLOCATE (alpha, ccore)

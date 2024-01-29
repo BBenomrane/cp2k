@@ -2418,7 +2418,7 @@ CONTAINS
                                                             matrix_s_aux, work_admm
       TYPE(dbcsr_type)                                   :: dbcsr_work
       TYPE(dft_control_type), POINTER                    :: dft_control
-      TYPE(pw_c1d_gs_type)                               :: rhoz_tot_gspace, zv_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rhoz_tot_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rhoz_g
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
@@ -2455,7 +2455,6 @@ CONTAINS
       END DO
       CALL auxbas_pw_pool%create_pw(rhoz_tot_gspace)
       CALL auxbas_pw_pool%create_pw(zv_hartree_rspace)
-      CALL auxbas_pw_pool%create_pw(zv_hartree_gspace)
 
       CALL pw_zero(rhoz_tot_gspace)
       DO ispin = 1, nspins
@@ -2465,9 +2464,8 @@ CONTAINS
       END DO
 
       CALL pw_poisson_solve(poisson_env, rhoz_tot_gspace, ehartree, &
-                            zv_hartree_gspace)
+                            zv_hartree_rspace)
 
-      CALL pw_transfer(zv_hartree_gspace, zv_hartree_rspace)
       CALL pw_scale(zv_hartree_rspace, zv_hartree_rspace%pw_grid%dvol)
 
       CALL qs_rho_get(rho, tau_r_valid=do_tau)
@@ -2508,7 +2506,6 @@ CONTAINS
       END DO
       CALL auxbas_pw_pool%give_back_pw(rhoz_tot_gspace)
       CALL auxbas_pw_pool%give_back_pw(zv_hartree_rspace)
-      CALL auxbas_pw_pool%give_back_pw(zv_hartree_gspace)
       DEALLOCATE (v_xc)
 
       IF (do_tau) THEN
@@ -3154,8 +3151,7 @@ CONTAINS
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: sab_orb, sac_ae, sac_ppl, sap_ppnl
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, rhoz_tot_gspace, &
-                                                            zv_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, rhoz_tot_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rhoz_g
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
@@ -3483,7 +3479,6 @@ CONTAINS
          END DO
          CALL auxbas_pw_pool%create_pw(rhoz_tot_gspace)
          CALL auxbas_pw_pool%create_pw(zv_hartree_rspace)
-         CALL auxbas_pw_pool%create_pw(zv_hartree_gspace)
 
          CALL pw_zero(rhoz_tot_gspace)
          DO ispin = 1, nspins
@@ -3503,7 +3498,7 @@ CONTAINS
             CALL pw_poisson_solve(poisson_env, &
                                   density=rhoz_tot_gspace, &
                                   ehartree=ehartree, &
-                                  vhartree=zv_hartree_gspace, &
+                                  vhartree=zv_hartree_rspace, &
                                   h_stress=h_stress, &
                                   aux_density=rho_tot_gspace)
 
@@ -3515,10 +3510,9 @@ CONTAINS
 
          ELSE
             CALL pw_poisson_solve(poisson_env, rhoz_tot_gspace, ehartree, &
-                                  zv_hartree_gspace)
+                                  zv_hartree_rspace)
          END IF
 
-         CALL pw_transfer(zv_hartree_gspace, zv_hartree_rspace)
          CALL pw_scale(zv_hartree_rspace, zv_hartree_rspace%pw_grid%dvol)
          CALL integrate_v_core_rspace(zv_hartree_rspace, qs_env)
 
@@ -3600,7 +3594,6 @@ CONTAINS
          END DO
          CALL auxbas_pw_pool%give_back_pw(rhoz_tot_gspace)
          CALL auxbas_pw_pool%give_back_pw(zv_hartree_rspace)
-         CALL auxbas_pw_pool%give_back_pw(zv_hartree_gspace)
          DEALLOCATE (v_xc)
 
          IF (do_tau) THEN

@@ -116,8 +116,8 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: atom_list
       LOGICAL                                            :: gapw, gapw_xc, gth_gspace, ionode, &
                                                             make_soft, mpi_io, paw_atom
-      REAL(KIND=dp) :: alpha, alpha_core, arg, charge, ehartree, exc, exc1, exp_rap, &
-         gapw_max_alpha, hard_radius, hard_value, soft_value, sqrt_alpha, sqrt_rap
+      REAL(KIND=dp) :: alpha, alpha_core, arg, charge, exc, exc1, exp_rap, gapw_max_alpha, &
+         hard_radius, hard_value, soft_value, sqrt_alpha, sqrt_rap
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:, :)        :: vh1_rad_h, vh1_rad_s
       REAL(KIND=dp), DIMENSION(3)                        :: rap, ratom, roffset, rpoint
       REAL(KIND=dp), DIMENSION(:), POINTER               :: cexp_ppl, rho_rad_z
@@ -298,8 +298,7 @@ CONTAINS
       CALL calc_rho_tot_gspace(rho_tot_gspace, qs_env, rho, &
                                skip_nuclear_density=.NOT. gapw)
 
-      CALL pw_poisson_solve(poisson_env, rho_tot_gspace, ehartree, &
-                            v_hartree_gspace)
+      CALL pw_poisson_solve(poisson_env, rho_tot_gspace, vhartree=v_hartree_gspace)
 
       !   -------------------------------------
       !   Atomic grids part
@@ -329,27 +328,6 @@ CONTAINS
 
                ALLOCATE (vh1_rad_h(grid_atom%nr, harmonics%max_iso_not0))
                ALLOCATE (vh1_rad_s(grid_atom%nr, harmonics%max_iso_not0))
-
-               ! DO iat = 1, natom ! natom = # atoms for ikind
-               !
-               !    iatom = atom_list(iat)
-               !    ratom = particle_set(iatom)%r
-               !
-               !    DO ig = v_hartree_gspace%pw_grid%first_gne0,v_hartree_gspace%pw_grid%ngpts_cut_local
-               !
-               !       gtemp = fourpi * charge / cell%deth * &
-               !               EXP ( - v_hartree_gspace%pw_grid%gsq(ig) / (4.0_dp * alpha_core) ) &
-               !               / v_hartree_gspace%pw_grid%gsq(ig)
-               !
-               !       arg = DOT_PRODUCT(v_hartree_gspace%pw_grid%g(:,ig),ratom)
-               !
-               !       gtemp = gtemp * CMPLX(COS(arg),-SIN(arg),KIND=dp)
-               !
-               !       v_hartree_gspace%array(ig) = v_hartree_gspace%array(ig) + gtemp
-               !    END DO
-               !    IF ( v_hartree_gspace%pw_grid%have_g0 ) v_hartree_gspace%array(1) = 0.0_dp
-               !
-               ! END DO
 
                bo_atom = get_limit(natom, para_env%num_pe, para_env%mepos)
 
