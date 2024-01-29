@@ -1701,8 +1701,7 @@ CONTAINS
       TYPE(mp_para_env_type), POINTER                    :: para_env
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: sab_orb
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, rhodn_tot_gspace, &
-                                                            v_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, rhodn_tot_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rho_g, rhoout_g
       TYPE(pw_c1d_gs_type), POINTER                      :: rho_core
       TYPE(pw_env_type), POINTER                         :: pw_env
@@ -1763,7 +1762,6 @@ CONTAINS
                       poisson_env=poisson_env)
 
       ! Calculate the Hartree potential
-      CALL auxbas_pw_pool%create_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%create_pw(rhodn_tot_gspace)
       CALL auxbas_pw_pool%create_pw(v_hartree_rspace)
 
@@ -1841,7 +1839,6 @@ CONTAINS
          CALL pw_poisson_solve(poisson_env, &
                                density=rho_tot_gspace, &  ! n_in
                                ehartree=ehartree, &
-                               vhartree=v_hartree_gspace, & ! v_H[n_in]
                                h_stress=h_stress, &
                                aux_density=rhodn_tot_gspace) ! n_out
 
@@ -2257,7 +2254,6 @@ CONTAINS
          END DO
          DEALLOCATE (v_xc_tau)
       END IF
-      CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%give_back_pw(rhodn_tot_gspace)
 
       ! Stress tensor - volume terms need to be stored,
