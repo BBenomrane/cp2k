@@ -623,7 +623,7 @@ CONTAINS
       TYPE(mp_para_env_type), POINTER                    :: para_env
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: sab_orb
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, v_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_grid_type), POINTER                        :: pw_grid
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
@@ -682,7 +682,6 @@ CONTAINS
                       poisson_env=poisson_env)
 
       ! Calculate the Hartree potential
-      CALL auxbas_pw_pool%create_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%create_pw(rho_tot_gspace)
       CALL auxbas_pw_pool%create_pw(v_hartree_rspace)
 
@@ -697,7 +696,7 @@ CONTAINS
          CALL pw_poisson_solve(poisson_env, &
                                density=rho_tot_gspace, &
                                ehartree=ehartree, &
-                               vhartree=v_hartree_gspace, &
+                               vhartree=v_hartree_rspace, &
                                h_stress=h_stress)
 
          virial%pv_ehartree = virial%pv_ehartree + h_stress/REAL(para_env%num_pe, dp)
@@ -712,10 +711,9 @@ CONTAINS
 
       ELSE
          CALL pw_poisson_solve(poisson_env, rho_tot_gspace, ehartree, &
-                               v_hartree_gspace)
+                               v_hartree_rspace)
       END IF
 
-      CALL pw_transfer(v_hartree_gspace, v_hartree_rspace)
       CALL pw_scale(v_hartree_rspace, v_hartree_rspace%pw_grid%dvol)
 
       ! Save density on real space grid for use in properties
@@ -1028,7 +1026,6 @@ CONTAINS
       IF (ASSOCIATED(v_tau_rspace)) DEALLOCATE (v_tau_rspace)
       !
       CALL auxbas_pw_pool%give_back_pw(rho_tot_gspace)
-      CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%give_back_pw(v_hartree_rspace)
 
       ! Stress tensor - volume terms need to be stored,
@@ -1908,7 +1905,7 @@ CONTAINS
          CALL pw_poisson_solve(poisson_env, &
                                density=rhodn_tot_gspace, &  ! delta_n
                                ehartree=dehartree, &
-                               vhartree=v_hartree_gspace, & ! v_H[delta_n]
+                               vhartree=dv_hartree_rspace, & ! v_H[delta_n]
                                h_stress=h_stress, &
                                aux_density=rho_tot_gspace)  ! n_in
 
@@ -1927,10 +1924,9 @@ CONTAINS
       ELSE
          ! v_H[dn]
          CALL pw_poisson_solve(poisson_env, rhodn_tot_gspace, dehartree, &
-                               v_hartree_gspace)
+                               dv_hartree_rspace)
       END IF
 
-      CALL pw_transfer(v_hartree_gspace, dv_hartree_rspace)
       CALL pw_scale(dv_hartree_rspace, dv_hartree_rspace%pw_grid%dvol)
       ! Getting nuclear force contribution from the core charge density
       ! Vh(rho_in + rho_c) + Vh(rho_out - rho_in)

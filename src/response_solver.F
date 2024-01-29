@@ -863,7 +863,7 @@ CONTAINS
       TYPE(oce_matrix_type), POINTER                     :: oce
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
       TYPE(pw_c1d_gs_type) :: rho_tot_gspace, rho_tot_gspace_gs, rho_tot_gspace_t, &
-         rhoz_tot_gspace, v_hartree_gspace_gs, v_hartree_gspace_t, zv_hartree_gspace
+         rhoz_tot_gspace, v_hartree_gspace_t, zv_hartree_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rho_g_aux, rho_g_gs, rho_g_t, rhoz_g, &
                                                             rhoz_g_aux, rhoz_g_xc
       TYPE(pw_c1d_gs_type), POINTER                      :: rho_core
@@ -1216,13 +1216,11 @@ CONTAINS
                CALL pw_axpy(rho_core, rho_tot_gspace_gs)
             END IF
             ! compute GS potential
-            CALL auxbas_pw_pool%create_pw(v_hartree_gspace_gs)
             CALL auxbas_pw_pool%create_pw(v_hartree_rspace_gs)
             NULLIFY (hartree_local_gs)
             CALL hartree_local_create(hartree_local_gs)
             CALL init_coulomb_local(hartree_local_gs, natom)
-            CALL pw_poisson_solve(poisson_env, rho_tot_gspace_gs, hartree_gs, v_hartree_gspace_gs)
-            CALL pw_transfer(v_hartree_gspace_gs, v_hartree_rspace_gs)
+            CALL pw_poisson_solve(poisson_env, rho_tot_gspace_gs, hartree_gs, v_hartree_rspace_gs)
             CALL pw_scale(v_hartree_rspace_gs, v_hartree_rspace_gs%pw_grid%dvol)
          END IF
       END IF
@@ -1335,7 +1333,6 @@ CONTAINS
          IF (ASSOCIATED(local_rho_set_gs)) CALL local_rho_set_release(local_rho_set_gs)
          IF (gapw) THEN
             IF (ASSOCIATED(hartree_local_gs)) CALL hartree_local_release(hartree_local_gs)
-            CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace_gs)
             CALL auxbas_pw_pool%give_back_pw(v_hartree_rspace_gs)
          END IF
          CALL auxbas_pw_pool%give_back_pw(rho_tot_gspace_gs)

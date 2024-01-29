@@ -223,7 +223,7 @@ CONTAINS
 
                         ! go the g-space and compute hartree energy
                         CALL pw_transfer(rho_r, rho_g)
-                        CALL pw_poisson_solve(poisson_env, rho_g, pair_energy, pot_g, &
+                        CALL pw_poisson_solve(poisson_env, rho_g, pair_energy, &
                                               greenfn=greenfn)
 
                         ! sum up to the full energy

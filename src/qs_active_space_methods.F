@@ -1220,11 +1220,11 @@ CONTAINS
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: sab_orb_sub
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
-      TYPE(pw_c1d_gs_type)                               :: pot_g, rho_g
+      TYPE(pw_c1d_gs_type)                               :: rho_g
       TYPE(pw_env_type), POINTER                         :: pw_env_sub
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
-      TYPE(pw_r3d_rs_type)                               :: rho_r, wfn_r
+      TYPE(pw_r3d_rs_type)                               :: pot_r, rho_r, wfn_r
       TYPE(pw_r3d_rs_type), ALLOCATABLE, &
          DIMENSION(:, :), TARGET                         :: wfn_a
       TYPE(pw_r3d_rs_type), POINTER                      :: wfn1, wfn2, wfn3, wfn4
@@ -1449,7 +1449,7 @@ CONTAINS
 
       ! get some of the grids ready
       CALL auxbas_pw_pool%create_pw(rho_r)
-      CALL auxbas_pw_pool%create_pw(pot_g)
+      CALL auxbas_pw_pool%create_pw(pot_r)
 
       ! run the FFT once, to set up buffers and to take into account the memory
       CALL pw_zero(rho_r)
@@ -1502,20 +1502,18 @@ CONTAINS
                         iwa1, iwa2, isp1, erint
                   END IF
                END IF
-               CALL pw_transfer(rho_r, rho_g)
-               CALL pw_poisson_solve(poisson_env, rho_g, pair_int, pot_g)
+               CALL pw_poisson_solve(poisson_env, rho_r, pair_int, pot_r)
                ! screening using pair_int
                IF (pair_int < eri_env%eps_integral) CYCLE
-               CALL pw_transfer(pot_g, rho_r)
                !
                IF (eri_env%method == eri_method_gpw_ht) THEN
-                  CALL pw_scale(rho_r, dvol)
+                  CALL pw_scale(pot_r, dvol)
                   DO isp2 = isp1, nspins
                      CALL get_mo_set(mo_set=mos(isp2), nmo=nmo2)
                      nx = (nmo2*(nmo2 + 1))/2
                      ALLOCATE (eri(nx), eri_index(nx))
                      CALL dbcsr_set(mat_munu%matrix, 0.0_dp)
-                     CALL integrate_v_rspace(rho_r, hmat=mat_munu, qs_env=qs_env, &
+                     CALL integrate_v_rspace(pot_r, hmat=mat_munu, qs_env=qs_env, &
                                              calculate_forces=.FALSE., compute_tau=.FALSE., gapw=.FALSE., &
                                              pw_env_external=pw_env_sub, task_list_external=task_list_sub)
 
@@ -1574,7 +1572,7 @@ CONTAINS
                                                        qs_kind_set, cell, dft_control, particle_set, pw_env_sub)
                         END IF
                         CALL pw_zero(wfn_r)
-                        CALL pw_multiply(wfn_r, rho_r, wfn3)
+                        CALL pw_multiply(wfn_r, pot_r, wfn3)
                         iwbt = i3
                         IF (isp1 == isp2 .AND. i1 == i3) iwbt = i2
                         DO i4 = iwbt, SIZE(orbitals, 1)
@@ -1653,7 +1651,7 @@ CONTAINS
       CALL auxbas_pw_pool%give_back_pw(wfn_r)
       CALL auxbas_pw_pool%give_back_pw(rho_g)
       CALL auxbas_pw_pool%give_back_pw(rho_r)
-      CALL auxbas_pw_pool%give_back_pw(pot_g)
+      CALL auxbas_pw_pool%give_back_pw(pot_r)
       CALL mp_para_env_release(para_env_sub)
 
       IF (eri_env%method == eri_method_gpw_ht) THEN

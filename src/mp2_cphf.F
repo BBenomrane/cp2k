@@ -1631,12 +1631,11 @@ CONTAINS
          DO idir = 1, 3
             CALL auxbas_pw_pool%create_pw(dvg(idir))
          END DO
-         CALL pw_poisson_solve(poisson_env, rho_tot_g, vhartree=pot_g, dvhartree=dvg)
+         CALL pw_poisson_solve(poisson_env, rho_tot_g, vhartree=pot_r, dvhartree=dvg)
       ELSE
-         CALL pw_poisson_solve(poisson_env, rho_tot_g, vhartree=pot_g)
+         CALL pw_poisson_solve(poisson_env, rho_tot_g, vhartree=pot_r)
       END IF
 
-      CALL pw_transfer(pot_g, pot_r)
       CALL pw_scale(pot_r, pot_r%pw_grid%dvol)
       CALL pw_axpy(pot_r, vh_rspace)
 

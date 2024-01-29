@@ -3359,7 +3359,7 @@ CONTAINS
       TYPE(qs_environment_type), POINTER                 :: qs_env
 
       LOGICAL                                            :: use_virial
-      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace, v_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho_tot_gspace
       TYPE(pw_c1d_gs_type), POINTER                      :: rho_core
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
@@ -3379,17 +3379,14 @@ CONTAINS
 
          CALL pw_env_get(pw_env, auxbas_pw_pool=auxbas_pw_pool, &
                          poisson_env=poisson_env)
-         CALL auxbas_pw_pool%create_pw(v_hartree_gspace)
          CALL auxbas_pw_pool%create_pw(rho_tot_gspace)
 
          CALL calc_rho_tot_gspace(rho_tot_gspace, qs_env, rho)
          CALL pw_poisson_solve(poisson_env, rho_tot_gspace, energy%hartree, &
-                               v_hartree_gspace, rho_core=rho_core)
+                               v_hartree_rspace, rho_core=rho_core)
 
-         CALL pw_transfer(v_hartree_gspace, v_hartree_rspace)
          CALL pw_scale(v_hartree_rspace, v_hartree_rspace%pw_grid%dvol)
 
-         CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
          CALL auxbas_pw_pool%give_back_pw(rho_tot_gspace)
       END IF
 

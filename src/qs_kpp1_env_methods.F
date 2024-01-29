@@ -298,15 +298,9 @@ CONTAINS
       END IF
 
       IF (.NOT. (nspins == 1 .AND. do_excitations .AND. do_triplet)) THEN
-         BLOCK
-            TYPE(pw_c1d_gs_type) :: v_hartree_gspace
-            CALL auxbas_pw_pool%create_pw(v_hartree_gspace)
-            CALL pw_poisson_solve(poisson_env, rho1_tot_gspace, &
-                                  energy_hartree, &
-                                  v_hartree_gspace)
-            CALL pw_transfer(v_hartree_gspace, v_hartree_rspace)
-            CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
-         END BLOCK
+         CALL pw_poisson_solve(poisson_env, rho1_tot_gspace, &
+                               energy_hartree, &
+                               v_hartree_rspace)
          CALL pw_scale(v_hartree_rspace, v_hartree_rspace%pw_grid%dvol)
       END IF
 

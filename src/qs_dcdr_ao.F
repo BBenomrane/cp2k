@@ -125,7 +125,7 @@ CONTAINS
       TYPE(cp_fm_type)                                   :: rho_ao_fm, rho_ao_s1, rho_ao_s1_rho_ao, &
                                                             s1_ao
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: rho1_ao, rho_ao
-      TYPE(pw_c1d_gs_type)                               :: rho1_tot_gspace, v_hartree_gspace
+      TYPE(pw_c1d_gs_type)                               :: rho1_tot_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rho1_g, rho1_g_pw
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(pw_poisson_type), POINTER                     :: poisson_env
@@ -238,7 +238,6 @@ CONTAINS
       ! Done with deriv_set and rho_set
 
       ALLOCATE (v_rspace_new(dcdr_env%nspins))
-      CALL auxbas_pw_pool%create_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%create_pw(v_hartree_rspace)
 
       ! Calculate the Hartree potential on the total density
@@ -252,8 +251,7 @@ CONTAINS
 
       CALL pw_poisson_solve(poisson_env, rho1_tot_gspace, &
                             energy_hartree, &
-                            v_hartree_gspace)
-      CALL pw_transfer(v_hartree_gspace, v_hartree_rspace)
+                            v_hartree_rspace)
 
       CALL auxbas_pw_pool%give_back_pw(rho1_tot_gspace)
 
@@ -289,7 +287,6 @@ CONTAINS
                                  calculate_forces=.FALSE.)
       END DO
 
-      CALL auxbas_pw_pool%give_back_pw(v_hartree_gspace)
       CALL auxbas_pw_pool%give_back_pw(v_hartree_rspace)
       DO ispin = 1, dcdr_env%nspins
          CALL auxbas_pw_pool%give_back_pw(v_rspace_new(ispin))

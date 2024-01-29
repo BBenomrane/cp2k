@@ -486,7 +486,6 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: mo_derivs, rho_ao, tmp_dbcsr
       TYPE(dbcsr_type), POINTER                          :: orb_density_matrix, orb_h
       TYPE(mo_set_type), DIMENSION(:), POINTER           :: mo_array
-      TYPE(pw_c1d_gs_type)                               :: work_v_gspace
       TYPE(pw_c1d_gs_type), DIMENSION(:), POINTER        :: rho_g
       TYPE(pw_c1d_gs_type), TARGET                       :: orb_rho_g, tmp_g
       TYPE(pw_env_type), POINTER                         :: pw_env
@@ -615,7 +614,6 @@ CONTAINS
       CALL auxbas_pw_pool%create_pw(tmp_r)
       CALL auxbas_pw_pool%create_pw(orb_rho_g)
       CALL auxbas_pw_pool%create_pw(tmp_g)
-      CALL auxbas_pw_pool%create_pw(work_v_gspace)
       CALL auxbas_pw_pool%create_pw(work_v_rspace)
 
       ALLOCATE (orb_density_matrix)
@@ -672,12 +670,14 @@ CONTAINS
 
          ! compute the energy functional for this orbital and its derivative
 
-         CALL pw_poisson_solve(poisson_env, orb_rho_g, ener, work_v_gspace)
-         ! no PBC correction is done here, see "calc_v_sic_rspace" for SIC methods
-         ! with PBC aware corrections
-         energy%hartree = energy%hartree - dft_control%sic_scaling_a*ener
-         IF (.NOT. just_energy) THEN
-            CALL pw_transfer(work_v_gspace, work_v_rspace)
+         IF (just_energy) THEN
+            CALL pw_poisson_solve(poisson_env, orb_rho_g, ener)
+            energy%hartree = energy%hartree - dft_control%sic_scaling_a*ener
+         ELSE
+            CALL pw_poisson_solve(poisson_env, orb_rho_g, ener, work_v_rspace)
+            ! no PBC correction is done here, see "calc_v_sic_rspace" for SIC methods
+            ! with PBC aware corrections
+            energy%hartree = energy%hartree - dft_control%sic_scaling_a*ener
             CALL pw_scale(work_v_rspace, -dft_control%sic_scaling_a*work_v_rspace%pw_grid%dvol)
             CALL dbcsr_set(orb_h, 0.0_dp)
          END IF
@@ -723,7 +723,6 @@ CONTAINS
       CALL auxbas_pw_pool%give_back_pw(tmp_r)
       CALL auxbas_pw_pool%give_back_pw(orb_rho_g)
       CALL auxbas_pw_pool%give_back_pw(tmp_g)
-      CALL auxbas_pw_pool%give_back_pw(work_v_gspace)
       CALL auxbas_pw_pool%give_back_pw(work_v_rspace)
 
       CALL dbcsr_deallocate_matrix(orb_density_matrix)
