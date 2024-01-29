@@ -683,6 +683,8 @@ CONTAINS
                         CALL pw_transfer(vhartree, tmpg)
                         ehartree = 0.5_dp*pw_integral_ab(density, tmpg)
                         CALL pw_pool%give_back_pw(tmpg)
+                     #:else
+                        #:stop "Unknown kind: "+kindd
                      #:endif
                   END IF
                END IF
