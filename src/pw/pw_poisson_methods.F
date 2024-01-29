@@ -429,18 +429,19 @@ CONTAINS
             CALL ps_wavelet_solve(poisson_env%wavelet, rhor%pw_grid)
             CALL z_slices_to_cp2k_distribution(rhor, poisson_env%wavelet, rhor%pw_grid)
             IF (PRESENT(ehartree)) THEN
-               #! This is actually not consequent but to keep it working, I leave it that way
-               #! Correctly, one checks the spaces but in CP2K, there is a separation in r-space/3D and g-space/1D in most cases
                #:if kindd=="r3d_rs"
                   ehartree = 0.5_dp*pw_integral_ab(density, rhor)
+                  IF (PRESENT(h_stress)) THEN
+                     CALL pw_pool%create_pw(rhog)
+                     CALL pw_transfer(rhor, rhog)
+                  END IF
                #:else
-                  IF (.NOT. PRESENT(h_stress)) CALL pw_pool%create_pw(rhog)
+                  CALL pw_pool%create_pw(rhog)
                   CALL pw_transfer(rhor, rhog)
                   ehartree = 0.5_dp*pw_integral_ab(density, rhog)
                   IF (.NOT. PRESENT(h_stress)) CALL pw_pool%give_back_pw(rhog)
                #:endif
-            END IF
-            IF (PRESENT(h_stress)) THEN
+            ELSE IF (PRESENT(h_stress)) THEN
                CALL pw_transfer(rhor, rhog)
             END IF
             CALL pw_pool%give_back_pw(rhor)
@@ -628,8 +629,6 @@ CONTAINS
                CALL z_slices_to_cp2k_distribution(rhor, poisson_env%wavelet, rhor%pw_grid)
                CALL pw_transfer(rhor, vhartree)
                IF (PRESENT(ehartree)) THEN
-                  #! This is actually not consequent but to keep it working, I leave it that way
-                  #! Correctly, one checks the spaces but in CP2K, there is a separation in r-space/3D and g-space/1D in most cases
                   #:if kindd==kindv
                      ehartree = 0.5_dp*pw_integral_ab(density, vhartree)
                   #:elif kindd=="r3d_rs"
@@ -740,7 +739,6 @@ CONTAINS
                   CALL pw_multiply_with(rhog, influence_fn)
                   IF (PRESENT(aux_density)) THEN
                      CALL pw_multiply_with(rhog_aux, influence_fn)
-                     rhog_aux%array(:) = rhog_aux%array(:)*influence_fn%array(:)
                   END IF
                   IF (PRESENT(ehartree)) THEN
                      ehartree = 0.5_dp*pw_integral_ab(rhog, tmpg)
@@ -813,8 +811,6 @@ CONTAINS
                CALL z_slices_to_cp2k_distribution(rhor, poisson_env%wavelet, rhor%pw_grid)
                CALL pw_transfer(rhor, rhog)
                IF (PRESENT(ehartree)) THEN
-                  #! This is actually not consequent but to keep it working, I leave it that way
-                  #! Correctly, one checks the spaces but in CP2K, there is a separation in r-space/3D and g-space/1D in most cases
                   #:if kindd=="r3d_rs"
                      ehartree = 0.5_dp*pw_integral_ab(density, rhor)
                   #:else
@@ -1012,8 +1008,6 @@ CONTAINS
                   CALL pw_transfer(rhor, vhartree)
                   CALL pw_transfer(rhor, rhog)
                   IF (PRESENT(ehartree)) THEN
-                     #! This is actually not consequent but to keep it working, I leave it that way
-                     #! Correctly, one checks the spaces but in CP2K, there is a separation in r-space/3D and g-space/1D in most cases
                      #:if kindd==kindv
                         ehartree = 0.5_dp*pw_integral_ab(density, vhartree)
                      #:elif kindd=="r3d_rs"
@@ -1022,7 +1016,6 @@ CONTAINS
                         ehartree = 0.5_dp*pw_integral_ab(density, rhog)
                      #:endif
                   END IF
-                  CALL pw_transfer(rhor, rhog)
                   CALL pw_pool%give_back_pw(rhor)
 
                END SELECT
