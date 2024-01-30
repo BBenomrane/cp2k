@@ -728,9 +728,9 @@ CONTAINS
 
          ! Distribute matrix blocks.
          IF (distributed_grids) THEN
-            CALL rs_scatter_matrices(deltap, task_list%pab_buffer, task_list, group)
+            CALL rs_scatter_matrices(deltap, task_list, group)
          ELSE
-            CALL rs_copy_to_buffer(deltap, task_list%pab_buffer, task_list)
+            CALL rs_copy_to_buffer(deltap, task_list)
          END IF
          DEALLOCATE (deltap)
       END IF
@@ -777,9 +777,9 @@ CONTAINS
 
       ! Distribute matrix blocks.
       IF (distributed_grids) THEN
-         CALL rs_gather_matrices(task_list%hab_buffer, dhmat, task_list, group)
+         CALL rs_gather_matrices(dhmat, task_list, group)
       ELSE
-         CALL rs_copy_to_matrices(task_list%hab_buffer, dhmat, task_list)
+         CALL rs_copy_to_matrices(dhmat, task_list)
       END IF
       DEALLOCATE (dhmat)
 

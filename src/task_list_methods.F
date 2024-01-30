@@ -2521,9 +2521,8 @@ CONTAINS
 !> \brief Scatters dbcsr matrix blocks and receives them into a buffer as needed before collocation.
 !> \author Ole Schuett
 ! **************************************************************************************************
-   SUBROUTINE rs_scatter_matrices(src_matrices, dest_buffer, task_list, group)
+   SUBROUTINE rs_scatter_matrices(src_matrices, task_list, group)
       TYPE(dbcsr_p_type), DIMENSION(:), INTENT(IN)       :: src_matrices
-      TYPE(offload_buffer_type), INTENT(INOUT)           :: dest_buffer
       TYPE(task_list_type), INTENT(IN)                   :: task_list
       TYPE(mp_comm_type), INTENT(IN)                     :: group
 
@@ -2544,7 +2543,7 @@ CONTAINS
 
       ! mpi all-to-all communication, receiving directly into blocks_recv%buffer.
       CALL group%alltoall(buffer_send, task_list%rank_sizes_send, task_list%rank_offsets_send, &
-                          dest_buffer%host_buffer, &
+                          task_list%pab_buffer%host_buffer, &
                           task_list%rank_sizes_recv, task_list%rank_offsets_recv)
 
       DEALLOCATE (buffer_send)
@@ -2556,8 +2555,7 @@ CONTAINS
 !> \brief Gather the dbcsr matrix blocks and receives them into a buffer as needed after integration.
 !> \author Ole Schuett
 ! **************************************************************************************************
-   SUBROUTINE rs_gather_matrices(src_buffer, dest_matrices, task_list, group)
-      TYPE(offload_buffer_type), INTENT(IN)              :: src_buffer
+   SUBROUTINE rs_gather_matrices(dest_matrices, task_list, group)
       TYPE(dbcsr_p_type), DIMENSION(:), INTENT(INOUT)    :: dest_matrices
       TYPE(task_list_type), INTENT(IN)                   :: task_list
       TYPE(mp_comm_type), INTENT(IN)                     :: group
@@ -2573,7 +2571,7 @@ CONTAINS
       ALLOCATE (buffer_send(task_list%buffer_size_send)) ! e.g. this is actually used for receiving
 
       ! mpi all-to-all communication
-      CALL group%alltoall(src_buffer%host_buffer, task_list%rank_sizes_recv, task_list%rank_offsets_recv, &
+      CALL group%alltoall(task_list%hab_buffer%host_buffer, task_list%rank_sizes_recv, task_list%rank_offsets_recv, &
                           buffer_send, task_list%rank_sizes_send, task_list%rank_offsets_send)
 
       ! unpack dbcsr blocks from send buffer
@@ -2592,13 +2590,12 @@ CONTAINS
 !> \brief Copies the DBCSR blocks into buffer, replaces rs_scatter_matrix for non-distributed grids.
 !> \author Ole Schuett
 ! **************************************************************************************************
-   SUBROUTINE rs_copy_to_buffer(src_matrices, dest_buffer, task_list)
+   SUBROUTINE rs_copy_to_buffer(src_matrices, task_list)
       TYPE(dbcsr_p_type), DIMENSION(:), INTENT(IN)       :: src_matrices
-      TYPE(offload_buffer_type), INTENT(INOUT)           :: dest_buffer
       TYPE(task_list_type), INTENT(IN)                   :: task_list
 
       CALL rs_pack_buffer(src_matrices=src_matrices, &
-                          dest_buffer=dest_buffer%host_buffer, &
+                          dest_buffer=task_list%pab_buffer%host_buffer, &
                           atom_pair=task_list%atom_pair_recv, &
                           pair_offsets=task_list%pair_offsets_recv)
 
@@ -2608,12 +2605,11 @@ CONTAINS
 !> \brief Copies from buffer into DBCSR matrics, replaces rs_gather_matrix for non-distributed grids.
 !> \author Ole Schuett
 ! **************************************************************************************************
-   SUBROUTINE rs_copy_to_matrices(src_buffer, dest_matrices, task_list)
-      TYPE(offload_buffer_type), INTENT(IN)              :: src_buffer
+   SUBROUTINE rs_copy_to_matrices(dest_matrices, task_list)
       TYPE(dbcsr_p_type), DIMENSION(:), INTENT(INOUT)    :: dest_matrices
       TYPE(task_list_type), INTENT(IN)                   :: task_list
 
-      CALL rs_unpack_buffer(src_buffer=src_buffer%host_buffer, &
+      CALL rs_unpack_buffer(src_buffer=task_list%hab_buffer%host_buffer, &
                             dest_matrices=dest_matrices, &
                             atom_pair=task_list%atom_pair_recv, &
                             pair_offsets=task_list%pair_offsets_recv)
@@ -2899,7 +2895,7 @@ CONTAINS
 !>      4.2009 created [Iain Bethune]
 !>        (c) The Numerical Algorithms Group (NAG) Ltd, 2009 on behalf of the HECToR project
 ! **************************************************************************************************
-   FUNCTION encode_rank(rank, grid_level, n_levels) RESULT(encoded_int)
+   PURE FUNCTION encode_rank(rank, grid_level, n_levels) RESULT(encoded_int)
 
       INTEGER, INTENT(IN)                                :: rank, grid_level, n_levels
       INTEGER                                            :: encoded_int
@@ -2916,7 +2912,7 @@ CONTAINS
 !> \param n_levels ...
 !> \return ...
 ! **************************************************************************************************
-   FUNCTION decode_rank(encoded_int, n_levels) RESULT(rank)
+   PURE FUNCTION decode_rank(encoded_int, n_levels) RESULT(rank)
 
       INTEGER, INTENT(IN)                                :: encoded_int
       INTEGER, INTENT(IN)                                :: n_levels
@@ -2932,7 +2928,7 @@ CONTAINS
 !> \param n_levels ...
 !> \return ...
 ! **************************************************************************************************
-   FUNCTION decode_level(encoded_int, n_levels) RESULT(grid_level)
+   PURE FUNCTION decode_level(encoded_int, n_levels) RESULT(grid_level)
 
       INTEGER, INTENT(IN)                                :: encoded_int
       INTEGER, INTENT(IN)                                :: n_levels

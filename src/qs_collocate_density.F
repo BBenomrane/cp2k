@@ -1602,9 +1602,9 @@ CONTAINS
 
       ! Distribute matrix blocks.
       IF (any_distributed) THEN
-         CALL rs_scatter_matrices(matrix_images, task_list%pab_buffer, task_list, group)
+         CALL rs_scatter_matrices(matrix_images, task_list, group)
       ELSE
-         CALL rs_copy_to_buffer(matrix_images, task_list%pab_buffer, task_list)
+         CALL rs_copy_to_buffer(matrix_images, task_list)
       END IF
       DEALLOCATE (matrix_images)
 
