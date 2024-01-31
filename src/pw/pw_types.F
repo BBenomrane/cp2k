@@ -23,6 +23,7 @@
 ! **************************************************************************************************
 MODULE pw_types
 
+   USE fft_tools, ONLY: fft_alloc, fft_dealloc
    USE cp_log_handling, ONLY: cp_to_string
    USE kinds, ONLY: dp
    USE pw_grid_types, ONLY: pw_grid_type
@@ -77,7 +78,11 @@ CONTAINS
          SUBROUTINE pw_release_${kind}$_${space}$ (pw)
             CLASS(pw_${kind}$_${space}$_type), INTENT(INOUT)                       :: pw
 
-            IF (ASSOCIATED(pw%array)) DEALLOCATE (pw%array)
+            #:if kind[0]=="c"
+               IF (ASSOCIATED(pw%array)) CALL fft_dealloc(pw%array)
+            #:else
+               IF (ASSOCIATED(pw%array)) DEALLOCATE (pw%array)
+            #:endif
             CALL pw_grid_release(pw%pw_grid)
          END SUBROUTINE pw_release_${kind}$_${space}$
 
@@ -114,7 +119,11 @@ CONTAINS
                pw%array(1:pw%pw_grid%ngpts_cut_local) => array_ptr
             END IF
             END IF
-            IF (.NOT. ASSOCIATED(pw%array)) ALLOCATE (pw%array(pw%pw_grid%ngpts_cut_local))
+            #:if kind=="c3d"
+               IF (.NOT. ASSOCIATED(pw%array)) CALL fft_alloc(pw%array, [pw%pw_grid%ngpts_cut_local])
+            #:else
+               IF (.NOT. ASSOCIATED(pw%array)) ALLOCATE (pw%array(pw%pw_grid%ngpts_cut_local))
+            #:endif
             #:elif kind[1]=="3"
             ASSOCIATE (bounds => pw%pw_grid%bounds_local)
                IF (PRESENT(array_ptr)) THEN
@@ -127,10 +136,21 @@ CONTAINS
                   END IF
                END IF
                IF (.NOT. ASSOCIATED(pw%array)) THEN
-                  ALLOCATE (pw%array( &
-                            bounds(1, 1):bounds(2, 1), &
-                            bounds(1, 2):bounds(2, 2), &
-                            bounds(1, 3):bounds(2, 3)))
+                  #:if kind=="c3d"
+                     BLOCK
+                        ${type}$, POINTER, CONTIGUOUS :: array
+                        CALL fft_alloc(array, bounds(2, :) - bounds(1, :) + 1)
+                        pw%array( &
+                           bounds(1, 1):bounds(2, 1), &
+                           bounds(1, 2):bounds(2, 2), &
+                           bounds(1, 3):bounds(2, 3)) => array
+                     END BLOCK
+                  #:else
+                     ALLOCATE (pw%array( &
+                               bounds(1, 1):bounds(2, 1), &
+                               bounds(1, 2):bounds(2, 2), &
+                               bounds(1, 3):bounds(2, 3)))
+                  #:endif
                END IF
             END ASSOCIATE
             #:endif
