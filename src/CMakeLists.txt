@@ -1144,6 +1144,7 @@ list(
   pw/fft/fftw3_lib.F
   pw/fft/mltfftsg_tools.F
   pw/fft_tools.F
+  pw/fft_size_types.F
   pw/lazy.F
   pw/mt_util.F
   pw_poisson_read_input.F

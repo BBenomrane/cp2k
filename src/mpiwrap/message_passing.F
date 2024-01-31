@@ -975,7 +975,7 @@ CONTAINS
       #:set types = ["comm", "request", "win", "file", "info"]
    #:endmute
    #:for type in types
-      LOGICAL FUNCTION mp_${type}$_op_eq(${type}$1, ${type}$2)
+      ELEMENTAL LOGICAL FUNCTION mp_${type}$_op_eq(${type}$1, ${type}$2)
          CLASS(mp_${type}$_type), INTENT(IN) :: ${type}$1, ${type}$2
 #if defined(__parallel) && defined(__MPI_F08)
          mp_${type}$_op_eq = (${type}$1%handle%mpi_val .EQ. ${type}$2%handle%mpi_val)
@@ -984,7 +984,7 @@ CONTAINS
 #endif
       END FUNCTION mp_${type}$_op_eq
 
-      LOGICAL FUNCTION mp_${type}$_op_neq(${type}$1, ${type}$2)
+      ELEMENTAL LOGICAL FUNCTION mp_${type}$_op_neq(${type}$1, ${type}$2)
          CLASS(mp_${type}$_type), INTENT(IN) :: ${type}$1, ${type}$2
 #if defined(__parallel) && defined(__MPI_F08)
          mp_${type}$_op_neq = (${type}$1%handle%mpi_val .NE. ${type}$2%handle%mpi_val)

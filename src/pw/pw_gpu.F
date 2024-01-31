@@ -28,8 +28,9 @@ MODULE pw_gpu
                                               C_INT,&
                                               C_LOC,&
                                               C_PTR
+   USE fft_size_types,                  ONLY: fft_size_type
    USE fft_tools,                       ONLY: &
-        cube_transpose_1, cube_transpose_2, fft_scratch_sizes, fft_scratch_type, get_fft_scratch, &
+        cube_transpose_1, cube_transpose_2, fft_scratch_type, get_fft_scratch, &
         release_fft_scratch, x_to_yz, xz_to_yz, yz_to_x, yz_to_xz
    USE kinds,                           ONLY: dp
    USE mathconstants,                   ONLY: z_zero
@@ -232,8 +233,8 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: r_dim, r_pos
       INTEGER, DIMENSION(:), POINTER                     :: n, nloc, nyzray
       INTEGER, DIMENSION(:, :, :, :), POINTER            :: bo
-      TYPE(fft_scratch_sizes)                            :: fft_scratch_size
       TYPE(fft_scratch_type), POINTER                    :: fft_scratch
+      TYPE(fft_size_type)                                :: fft_scratch_size
       TYPE(mp_cart_type)                                 :: rs_group
       TYPE(mp_comm_type)                                 :: gs_group
 
@@ -404,8 +405,8 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: r_dim, r_pos
       INTEGER, DIMENSION(:), POINTER                     :: n, nloc, nyzray
       INTEGER, DIMENSION(:, :, :, :), POINTER            :: bo
-      TYPE(fft_scratch_sizes)                            :: fft_scratch_size
       TYPE(fft_scratch_type), POINTER                    :: fft_scratch
+      TYPE(fft_size_type)                                :: fft_scratch_size
       TYPE(mp_cart_type)                                 :: rs_group
       TYPE(mp_comm_type)                                 :: gs_group
 

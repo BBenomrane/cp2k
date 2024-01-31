@@ -35,6 +35,7 @@ MODULE fft_tools
         fft_1dm, fft_3d, fft_alloc, fft_create_plan_1dm, fft_create_plan_3d, fft_dealloc, &
         fft_destroy_plan, fft_do_cleanup, fft_do_init, fft_get_lengths, fft_library
    USE fft_plan,                        ONLY: fft_plan_type
+   USE fft_size_types,                  ONLY: fft_size_type
    USE kinds,                           ONLY: dp,&
                                               dp_size,&
                                               sp
@@ -56,23 +57,6 @@ MODULE fft_tools
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'fft_tools'
 
    ! Types for the pool of scratch data needed in FFT routines
-   ! keep the subroutine "is_equal" up-to-date
-   ! needs a default initialization
-   TYPE fft_scratch_sizes
-      INTEGER                              :: nx = 0, ny = 0, nz = 0
-      INTEGER                              :: lmax = 0, mmax = 0, nmax = 0
-      INTEGER                              :: mx1 = 0, mx2 = 0, mx3 = 0
-      INTEGER                              :: my1 = 0, my2 = 0, my3 = 0
-      INTEGER                              :: mz1 = 0, mz2 = 0, mz3 = 0
-      INTEGER                              :: mcz1 = 0, mcz2 = 0, mcy3 = 0, mcx2 = 0
-      INTEGER                              :: lg = 0, mg = 0
-      INTEGER                              :: nbx = 0, nbz = 0
-      INTEGER                              :: nmray = 0, nyzray = 0
-      TYPE(mp_comm_type)                   :: gs_group = mp_comm_type()
-      TYPE(mp_cart_type)                   :: rs_group = mp_cart_type()
-      INTEGER, DIMENSION(2)                :: g_pos = 0, r_pos = 0, r_dim = 0
-      INTEGER                              :: numtask = 0
-   END TYPE fft_scratch_sizes
 
    TYPE fft_scratch_type
       INTEGER                              :: fft_scratch_id = 0
@@ -116,7 +100,7 @@ MODULE fft_tools
          :: ss => NULL(), tt => NULL()
       INTEGER, DIMENSION(:, :), POINTER, CONTIGUOUS     :: pgrid => NULL()
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS       :: xcor => NULL(), zcor => NULL(), pzcoord => NULL()
-      TYPE(fft_scratch_sizes)              :: sizes = fft_scratch_sizes()
+      TYPE(fft_size_type)              :: sizes = fft_size_type()
       TYPE(fft_plan_type), DIMENSION(6)   :: fft_plan = fft_plan_type()
       INTEGER                              :: last_tick = -1
    END TYPE fft_scratch_type
@@ -159,7 +143,7 @@ MODULE fft_tools
    PUBLIC :: get_fft_scratch, release_fft_scratch
    PUBLIC :: cube_transpose_1, cube_transpose_2
    PUBLIC :: yz_to_x, x_to_yz, xz_to_yz, yz_to_xz
-   PUBLIC :: fft_scratch_sizes, fft_scratch_type
+   PUBLIC :: fft_scratch_type
    PUBLIC :: fft_type, fft_plan_style
 
    INTERFACE fft3d
@@ -526,8 +510,8 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
       LOGICAL                                            :: test
       REAL(KIND=dp)                                      :: norm, sum_data
-      TYPE(fft_scratch_sizes)                            :: fft_scratch_size
       TYPE(fft_scratch_type), POINTER                    :: fft_scratch
+      TYPE(fft_size_type)                                :: fft_scratch_size
 
       CALL timeset(routineN, handle)
       output_unit = cp_logger_get_default_io_unit()
@@ -973,8 +957,8 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: dim
       LOGICAL                                            :: test
       REAL(KIND=dp)                                      :: norm, sum_data
-      TYPE(fft_scratch_sizes)                            :: fft_scratch_size
       TYPE(fft_scratch_type), POINTER                    :: fft_scratch
+      TYPE(fft_size_type)                                :: fft_scratch_size
 
 !------------------------------------------------------------------------------
 ! "Real Space"  1) xyZ      or      1) xYZ
@@ -2876,7 +2860,7 @@ CONTAINS
       TYPE(fft_scratch_type), POINTER          :: fft_scratch
       INTEGER, INTENT(IN)                      :: tf_type
       INTEGER, DIMENSION(:), INTENT(IN)        :: n
-      TYPE(fft_scratch_sizes), INTENT(IN), &
+      TYPE(fft_size_type), INTENT(IN), &
          OPTIONAL                               :: fft_sizes
 
       CHARACTER(len=*), PARAMETER :: routineN = 'get_fft_scratch'
@@ -2885,7 +2869,6 @@ CONTAINS
                  mcx2, mcy3, mcz1, mcz2, mg, mmax, mx1, mx2, my1, my3, mz1, mz2, mz3, &
                  nbx, nbz, nm, nmax, nmray, np, nx, ny, nyzray, nz, pos(2)
       INTEGER, DIMENSION(3)                    :: pcoord
-      LOGICAL                                  :: equal
       LOGICAL, DIMENSION(2)                    :: dims
       TYPE(fft_scratch_pool_type), POINTER     :: fft_scratch_current, &
                                                   fft_scratch_last, &
@@ -2928,8 +2911,7 @@ CONTAINS
                   fft_scratch_current => fft_scratch_current%fft_scratch_next
                   CYCLE
                END IF
-               CALL is_equal(fft_sizes, fft_scratch_current%fft_scratch%sizes, equal)
-               IF (.NOT. equal) THEN
+               IF (.NOT. (fft_sizes == fft_scratch_current%fft_scratch%sizes)) THEN
                   fft_scratch_last => fft_scratch_current
                   fft_scratch_current => fft_scratch_current%fft_scratch_next
                   CYCLE
@@ -3331,59 +3313,5 @@ CONTAINS
       CALL group%sync()
 
    END SUBROUTINE sparse_alltoall
-
-! **************************************************************************************************
-!> \brief  test data structures for equality. It is assumed that if they are
-!>         different for one mpi task they are different for all (??)
-!> \param fft_size_1 ...
-!> \param fft_size_2 ...
-!> \param equal ...
-! **************************************************************************************************
-   SUBROUTINE is_equal(fft_size_1, fft_size_2, equal)
-      TYPE(fft_scratch_sizes)                            :: fft_size_1, fft_size_2
-      LOGICAL                                            :: equal
-
-      equal = .TRUE.
-
-      equal = equal .AND. fft_size_1%nx == fft_size_2%nx
-      equal = equal .AND. fft_size_1%ny == fft_size_2%ny
-      equal = equal .AND. fft_size_1%nz == fft_size_2%nz
-
-      equal = equal .AND. fft_size_1%lmax == fft_size_2%lmax
-      equal = equal .AND. fft_size_1%mmax == fft_size_2%mmax
-      equal = equal .AND. fft_size_1%nmax == fft_size_2%nmax
-
-      equal = equal .AND. fft_size_1%mx1 == fft_size_2%mx1
-      equal = equal .AND. fft_size_1%mx2 == fft_size_2%mx2
-      equal = equal .AND. fft_size_1%mx3 == fft_size_2%mx3
-
-      equal = equal .AND. fft_size_1%my1 == fft_size_2%my1
-      equal = equal .AND. fft_size_1%my2 == fft_size_2%my2
-      equal = equal .AND. fft_size_1%my3 == fft_size_2%my3
-
-      equal = equal .AND. fft_size_1%mcz1 == fft_size_2%mcz1
-      equal = equal .AND. fft_size_1%mcx2 == fft_size_2%mcx2
-      equal = equal .AND. fft_size_1%mcz2 == fft_size_2%mcz2
-      equal = equal .AND. fft_size_1%mcy3 == fft_size_2%mcy3
-
-      equal = equal .AND. fft_size_1%lg == fft_size_2%lg
-      equal = equal .AND. fft_size_1%mg == fft_size_2%mg
-
-      equal = equal .AND. fft_size_1%nbx == fft_size_2%nbx
-      equal = equal .AND. fft_size_1%nbz == fft_size_2%nbz
-
-      equal = equal .AND. fft_size_1%nmray == fft_size_2%nmray
-      equal = equal .AND. fft_size_1%nyzray == fft_size_2%nyzray
-
-      equal = equal .AND. fft_size_1%gs_group == fft_size_2%gs_group
-      equal = equal .AND. fft_size_1%rs_group == fft_size_2%rs_group
-
-      equal = equal .AND. ALL(fft_size_1%g_pos == fft_size_2%g_pos)
-      equal = equal .AND. ALL(fft_size_1%r_pos == fft_size_2%r_pos)
-      equal = equal .AND. ALL(fft_size_1%r_dim == fft_size_2%r_dim)
-
-      equal = equal .AND. fft_size_1%numtask == fft_size_2%numtask
-
-   END SUBROUTINE is_equal
 
 END MODULE fft_tools
