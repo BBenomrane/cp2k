@@ -308,7 +308,7 @@ CONTAINS
       TYPE(realspace_grid_type), POINTER                 :: diel_rs_grid
       TYPE(pw_pool_type), INTENT(IN), POINTER            :: pw_pool
       TYPE(pw_type), INTENT(IN)                          :: rho
-      TYPE(pw_type), INTENT(IN), OPTIONAL                :: rho_core
+      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL                :: rho_core
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'dielectric_compute_periodic'
       REAL(dp), PARAMETER                                :: small_value = EPSILON(1.0_dp)
@@ -701,7 +701,7 @@ CONTAINS
       INTEGER, DIMENSION(:), INTENT(IN), POINTER         :: dests_expand, srcs_expand, flipg_stat
       INTEGER, DIMENSION(2, 3), INTENT(IN)               :: bounds_shftd
       TYPE(pw_type), INTENT(IN)                          :: rho
-      TYPE(pw_type), INTENT(IN), OPTIONAL                :: rho_core
+      TYPE(pw_c1d_type), INTENT(IN), OPTIONAL                :: rho_core
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'dielectric_compute_neumann'
       REAL(dp), PARAMETER                                :: small_value = EPSILON(1.0_dp)

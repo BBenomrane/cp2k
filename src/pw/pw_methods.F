@@ -133,6 +133,10 @@ MODULE pw_methods
 
    INTERFACE pw_axpy
       MODULE PROCEDURE pw_axpy_pw
+      #:for kind in pw_kinds
+         MODULE PROCEDURE pw_axpy_${kind}$_pw
+         MODULE PROCEDURE pw_axpy_pw_${kind}$
+      #:endfor
       #:for kind, kind2 in pw_kinds2_sameD
          MODULE PROCEDURE pw_axpy_${kind}$_${kind2}$
       #:endfor
@@ -226,6 +230,520 @@ MODULE pw_methods
 CONTAINS
 
    #:for kind, type in pw_list
+
+! **************************************************************************************************
+!> \brief pw2 = alpha*pw1 + beta*pw2
+!>      alpha defaults to 1, beta defaults to 1
+!> \param pw1 ...
+!> \param pw2 ...
+!> \param alpha ...
+!> \param beta ...
+!> \param allow_noncompatible_grids ...
+!> \par History
+!>      JGH (21-Feb-2003) : added reference grid functionality
+!>      JGH (01-Dec-2007) : rename and remove complex alpha
+!> \author apsi
+!> \note
+!>      Currently only summing up of respective types allowed,
+!>      in order to avoid errors
+! **************************************************************************************************
+      SUBROUTINE pw_axpy_${kind}$_pw(pw1, pw2, alpha, beta, allow_noncompatible_grids)
+
+         TYPE(pw_${kind}$_type), INTENT(IN)                          :: pw1
+         TYPE(pw_type), INTENT(INOUT)                       :: pw2
+         REAL(KIND=dp), INTENT(in), OPTIONAL                :: alpha, beta
+         LOGICAL, INTENT(IN), OPTIONAL                      :: allow_noncompatible_grids
+
+         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_axpy'
+
+         INTEGER                                            :: handle, out_unit
+         #:if kind=="c1d"
+            INTEGER                                            :: i, j, ng, ng1, ng2
+         #:endif
+         LOGICAL                                            :: my_allow_noncompatible_grids
+         REAL(KIND=dp)                                      :: my_alpha, my_beta
+
+         CALL timeset(routineN, handle)
+
+         out_unit = cp_logger_get_default_io_unit()
+
+         my_alpha = 1.0_dp
+         IF (PRESENT(alpha)) my_alpha = alpha
+
+         my_beta = 1.0_dp
+         IF (PRESENT(beta)) my_beta = beta
+
+         my_allow_noncompatible_grids = .FALSE.
+         IF (PRESENT(allow_noncompatible_grids)) my_allow_noncompatible_grids = allow_noncompatible_grids
+
+         CALL pw_scale(pw2, my_beta)
+
+         IF (ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
+
+            IF (.FALSE.) THEN
+               #:if kind=="r1d"
+                  ELSE IF (pw2%in_use == REALDATA1D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%cr = pw2%cr + pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw2,pw1,my_alpha)
+                     pw2%cr = pw2%cr + my_alpha*pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+               #:if kind=="c1d"
+                  ELSE IF (pw2%in_use == COMPLEXDATA1D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%cc = pw2%cc + pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw2,my_alpha,pw1)
+                     pw2%cc = pw2%cc + my_alpha*pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+               #:if kind=="r3d"
+                  ELSE IF (pw2%in_use == REALDATA3D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%cr3d = pw2%cr3d + pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, my_alpha)
+                     pw2%cr3d = pw2%cr3d + my_alpha*pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+               #:if kind=="c3d"
+                  ELSE IF (pw2%in_use == COMPLEXDATA3D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%cc3d = pw2%cc3d + pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, my_alpha)
+                     pw2%cc3d = pw2%cc3d + my_alpha*pw1%array
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+            ELSE
+               CPABORT("No suitable data field")
+            END IF
+
+         ELSE IF (pw_compatible(pw1%pw_grid, pw2%pw_grid) .OR. my_allow_noncompatible_grids) THEN
+            IF (.FALSE.) THEN
+               #:if kind=="c1d"
+                  ELSE IF (pw2%in_use == COMPLEXDATA1D .AND. &
+                           pw1%in_space == RECIPROCALSPACE .AND. &
+                           pw2%in_space == RECIPROCALSPACE) THEN
+
+                  ng1 = SIZE(pw1%array)
+                  ng2 = SIZE(pw2%cc)
+                  ng = MIN(ng1, ng2)
+
+                  IF (pw1%pw_grid%spherical) THEN
+
+                     IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(ng, pw1, pw2)
+                        DO i = 1, ng
+                           pw2%cc(i) = pw2%cc(i) + pw1%array(i)
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(pw2,pw1,my_alpha,ng)
+                        DO i = 1, ng
+                           pw2%cc(i) = pw2%cc(i) + my_alpha*pw1%array(i)
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
+
+                  ELSE IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
+
+                     IF (my_alpha == 1.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%cc(i) = pw2%cc(i) + pw1%array(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%cc(j) = pw2%cc(j) + pw1%array(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%cc(i) = pw2%cc(i) + my_alpha*pw1%array(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%cc(j) = pw2%cc(j) + my_alpha*pw1%array(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     END IF
+                  ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
+
+                     IF (my_alpha == 1.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%cc(i) = pw2%cc(i) + pw1%array(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%cc(j) = pw2%cc(j) + pw1%array(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%cc(i) = pw2%cc(i) + my_alpha*pw1%array(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%cc(j) = pw2%cc(j) + my_alpha*pw1%array(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     END IF
+                  ELSE
+                     IF (out_unit > 0) THEN
+                        WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                           " grid 1 :", pw1%pw_grid%id_nr, &
+                           " sperical :", pw1%pw_grid%spherical, &
+                           " reference :", pw1%pw_grid%reference
+                        WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                           " grid 2 :", pw2%pw_grid%id_nr, &
+                           " sperical :", pw2%pw_grid%spherical, &
+                           " reference :", pw2%pw_grid%reference
+                     END IF
+                     CPABORT("Grids not compatible")
+
+                  END IF
+               #:endif
+               #:if kind=="r3d"
+                  ELSE IF (pw2%in_use == REALDATA3D .AND. &
+                           pw1%in_space == REALSPACE .AND. &
+                           pw2%in_space == REALSPACE) THEN
+
+                  IF (ANY(SHAPE(pw1%array) /= SHAPE(pw2%cr3d))) &
+                     CPABORT("Noncommensurate grids not implemented for real-valued grids!")
+
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
+                     pw2%cr3d(:, :, :) = pw2%cr3d(:, :, :) + pw1%array(:, :, :)
+!$OMP END PARALLEL WORKSHARE
+                  ELSE
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2,my_alpha)
+                     pw2%cr3d(:, :, :) = pw2%cr3d(:, :, :) + my_alpha*pw1%array(:, :, :)
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+            ELSE
+               CPABORT("No suitable data field")
+            END IF
+
+         ELSE
+
+            IF (out_unit > 0) THEN
+               WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                  " grid 1 :", pw1%pw_grid%id_nr, &
+                  " sperical :", pw1%pw_grid%spherical, &
+                  " reference :", pw1%pw_grid%reference
+               WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                  " grid 2 :", pw2%pw_grid%id_nr, &
+                  " sperical :", pw2%pw_grid%spherical, &
+                  " reference :", pw2%pw_grid%reference
+            END IF
+
+            CPABORT("Grids not compatible")
+
+         END IF
+
+         CALL timestop(handle)
+
+      END SUBROUTINE pw_axpy_${kind}$_pw
+
+! **************************************************************************************************
+!> \brief pw2 = alpha*pw1 + beta*pw2
+!>      alpha defaults to 1, beta defaults to 1
+!> \param pw1 ...
+!> \param pw2 ...
+!> \param alpha ...
+!> \param beta ...
+!> \param allow_noncompatible_grids ...
+!> \par History
+!>      JGH (21-Feb-2003) : added reference grid functionality
+!>      JGH (01-Dec-2007) : rename and remove complex alpha
+!> \author apsi
+!> \note
+!>      Currently only summing up of respective types allowed,
+!>      in order to avoid errors
+! **************************************************************************************************
+      SUBROUTINE pw_axpy_pw_${kind}$ (pw1, pw2, alpha, beta, allow_noncompatible_grids)
+
+         TYPE(pw_type), INTENT(IN)                          :: pw1
+         TYPE(pw_${kind}$_type), INTENT(INOUT)                       :: pw2
+         REAL(KIND=dp), INTENT(in), OPTIONAL                :: alpha, beta
+         LOGICAL, INTENT(IN), OPTIONAL                      :: allow_noncompatible_grids
+
+         CHARACTER(len=*), PARAMETER                        :: routineN = 'pw_axpy'
+
+         INTEGER                                            :: handle, out_unit
+         #:if kind=="c1d"
+            INTEGER                                            :: i, j, ng, ng1, ng2
+         #:endif
+         LOGICAL                                            :: my_allow_noncompatible_grids
+         REAL(KIND=dp)                                      :: my_alpha, my_beta
+
+         CALL timeset(routineN, handle)
+
+         out_unit = cp_logger_get_default_io_unit()
+
+         my_alpha = 1.0_dp
+         IF (PRESENT(alpha)) my_alpha = alpha
+
+         my_beta = 1.0_dp
+         IF (PRESENT(beta)) my_beta = beta
+
+         my_allow_noncompatible_grids = .FALSE.
+         IF (PRESENT(allow_noncompatible_grids)) my_allow_noncompatible_grids = allow_noncompatible_grids
+
+         CALL pw_scale(pw2, my_beta)
+
+         IF (ASSOCIATED(pw1%pw_grid, pw2%pw_grid)) THEN
+            IF (.FALSE.) THEN
+               #:if kind=="r1d"
+                  ELSE IF (pw1%in_use == REALDATA1D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%array = pw2%array + pw1%cr
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw2,pw1,my_alpha)
+                     pw2%array = pw2%array + my_alpha*pw1%cr
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+               #:if kind=="c1d"
+                  ELSE IF (pw1%in_use == COMPLEXDATA1D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%array = pw2%array + pw1%cc
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw2,my_alpha,pw1)
+                     pw2%array = pw2%array + my_alpha*pw1%cc
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+               #:if kind=="r3d"
+                  ELSE IF (pw1%in_use == REALDATA3D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%array = pw2%array + pw1%cr3d
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, my_alpha)
+                     pw2%array = pw2%array + my_alpha*pw1%cr3d
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+               #:if kind=="c3d"
+                  ELSE IF (pw1%in_use == COMPLEXDATA3D) THEN
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2)
+                     pw2%array = pw2%array + pw1%cc3d
+!$OMP END PARALLEL WORKSHARE
+                  ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1, pw2, my_alpha)
+                     pw2%array = pw2%array + my_alpha*pw1%cc3d
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+            ELSE
+               CPABORT("No suitable data field")
+            END IF
+
+         ELSE IF (pw_compatible(pw1%pw_grid, pw2%pw_grid) .OR. my_allow_noncompatible_grids) THEN
+
+            IF (.FALSE.) THEN
+               #:if kind=="c1d"
+                  ELSE IF (pw1%in_use == COMPLEXDATA1D .AND. &
+                           pw1%in_space == RECIPROCALSPACE .AND. &
+                           pw2%in_space == RECIPROCALSPACE) THEN
+
+                  ng1 = SIZE(pw1%cc)
+                  ng2 = SIZE(pw2%array)
+                  ng = MIN(ng1, ng2)
+
+                  IF (pw1%pw_grid%spherical) THEN
+
+                     IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(ng, pw1, pw2)
+                        DO i = 1, ng
+                           pw2%array(i) = pw2%array(i) + pw1%cc(i)
+                        END DO
+!$OMP END PARALLEL DO
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+!$OMP PARALLEL DO PRIVATE(i) DEFAULT(NONE) SHARED(pw2,pw1,my_alpha,ng)
+                        DO i = 1, ng
+                           pw2%array(i) = pw2%array(i) + my_alpha*pw1%cc(i)
+                        END DO
+!$OMP END PARALLEL DO
+                     END IF
+
+                  ELSE IF ((pw1%pw_grid%id_nr == pw2%pw_grid%reference)) THEN
+
+                     IF (my_alpha == 1.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%array(i) = pw2%array(i) + pw1%cc(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%array(j) = pw2%array(j) + pw1%cc(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%array(i) = pw2%array(i) + my_alpha*pw1%cc(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw2%pw_grid%gidx(i)
+                              pw2%array(j) = pw2%array(j) + my_alpha*pw1%cc(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     END IF
+                  ELSE IF ((pw2%pw_grid%id_nr == pw1%pw_grid%reference)) THEN
+
+                     IF (my_alpha == 1.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%array(i) = pw2%array(i) + pw1%cc(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%array(j) = pw2%array(j) + pw1%cc(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     ELSE IF (my_alpha /= 0.0_dp) THEN
+                        IF (ng1 >= ng2) THEN
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng2, pw1, pw2)
+                           DO i = 1, ng2
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%array(i) = pw2%array(i) + my_alpha*pw1%cc(j)
+                           END DO
+!$OMP END PARALLEL DO
+                        ELSE
+!$OMP PARALLEL DO PRIVATE(i,j) DEFAULT(NONE) SHARED(my_alpha, ng1, pw1, pw2)
+                           DO i = 1, ng1
+                              j = pw1%pw_grid%gidx(i)
+                              pw2%array(j) = pw2%array(j) + my_alpha*pw1%cc(i)
+                           END DO
+!$OMP END PARALLEL DO
+                        END IF
+                     END IF
+                  ELSE
+                     IF (out_unit > 0) THEN
+                        WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                           " grid 1 :", pw1%pw_grid%id_nr, &
+                           " sperical :", pw1%pw_grid%spherical, &
+                           " reference :", pw1%pw_grid%reference
+                        WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                           " grid 2 :", pw2%pw_grid%id_nr, &
+                           " sperical :", pw2%pw_grid%spherical, &
+                           " reference :", pw2%pw_grid%reference
+                     END IF
+                     CPABORT("Grids not compatible")
+
+                  END IF
+               #:endif
+               #:if kind=="r3d"
+                  ELSE IF (pw1%in_use == REALDATA3D .AND. &
+                           pw1%in_space == REALSPACE .AND. &
+                           pw2%in_space == REALSPACE) THEN
+
+                  IF (ANY(SHAPE(pw1%cr3d) /= SHAPE(pw2%array))) &
+                     CPABORT("Noncommensurate grids not implemented for real-valued grids!")
+
+                  IF (my_alpha == 1.0_dp) THEN
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2)
+                     pw2%array(:, :, :) = pw2%array(:, :, :) + pw1%cr3d(:, :, :)
+!$OMP END PARALLEL WORKSHARE
+                  ELSE
+!$OMP PARALLEL WORKSHARE DEFAULT(NONE) SHARED(pw1,pw2,my_alpha)
+                     pw2%array(:, :, :) = pw2%array(:, :, :) + my_alpha*pw1%cr3d(:, :, :)
+!$OMP END PARALLEL WORKSHARE
+                  END IF
+               #:endif
+            ELSE
+               CPABORT("No suitable data field")
+            END IF
+
+         ELSE
+
+            IF (out_unit > 0) THEN
+               WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                  " grid 1 :", pw1%pw_grid%id_nr, &
+                  " sperical :", pw1%pw_grid%spherical, &
+                  " reference :", pw1%pw_grid%reference
+               WRITE (out_unit, "(A,I5,T30,A,L1,T60,A,I5)") &
+                  " grid 2 :", pw2%pw_grid%id_nr, &
+                  " sperical :", pw2%pw_grid%spherical, &
+                  " reference :", pw2%pw_grid%reference
+            END IF
+
+            CPABORT("Grids not compatible")
+
+         END IF
+
+         CALL timestop(handle)
+
+      END SUBROUTINE pw_axpy_pw_${kind}$
 
 ! **************************************************************************************************
 !> \brief Generalize copy of pw types
