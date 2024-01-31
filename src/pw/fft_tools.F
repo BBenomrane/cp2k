@@ -35,7 +35,6 @@ MODULE fft_tools
         fft_1dm, fft_3d, fft_alloc, fft_create_plan_1dm, fft_create_plan_3d, fft_dealloc, &
         fft_destroy_plan, fft_do_cleanup, fft_do_init, fft_get_lengths, fft_library
    USE fft_plan,                        ONLY: fft_plan_type
-   USE fft_size_types,                  ONLY: fft_size_type
    USE kinds,                           ONLY: dp,&
                                               dp_size,&
                                               sp
@@ -57,6 +56,26 @@ MODULE fft_tools
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'fft_tools'
 
    ! Types for the pool of scratch data needed in FFT routines
+   ! keep the subroutine "is_equal" up-to-date
+   ! needs a default initialization
+   TYPE fft_size_type
+      INTEGER                              :: nx = 0, ny = 0, nz = 0
+      INTEGER                              :: lmax = 0, mmax = 0, nmax = 0
+      INTEGER                              :: mx1 = 0, mx2 = 0, mx3 = 0
+      INTEGER                              :: my1 = 0, my2 = 0, my3 = 0
+      INTEGER                              :: mz1 = 0, mz2 = 0, mz3 = 0
+      INTEGER                              :: mcz1 = 0, mcz2 = 0, mcy3 = 0, mcx2 = 0
+      INTEGER                              :: lg = 0, mg = 0
+      INTEGER                              :: nbx = 0, nbz = 0
+      INTEGER                              :: nmray = 0, nyzray = 0
+      TYPE(mp_comm_type)                   :: gs_group = mp_comm_type()
+      TYPE(mp_cart_type)                   :: rs_group = mp_cart_type()
+      INTEGER, DIMENSION(2)                :: g_pos = 0, r_pos = 0, r_dim = 0
+      INTEGER                              :: numtask = 0
+   CONTAINS
+      PROCEDURE, PRIVATE, PASS(this), NON_OVERRIDABLE :: fft_size_is_equal
+      GENERIC, PUBLIC :: OPERATOR(==) => fft_size_is_equal
+   END TYPE fft_size_type
 
    TYPE fft_scratch_type
       INTEGER                              :: fft_scratch_id = 0
@@ -87,7 +106,8 @@ MODULE fft_tools
       INTEGER, DIMENSION(:), CONTIGUOUS, POINTER       :: scount => NULL(), rcount => NULL(), sdispl => NULL(), rdispl => NULL()
       INTEGER, DIMENSION(:, :), CONTIGUOUS, POINTER     :: pgcube => NULL()
       INTEGER, DIMENSION(:), CONTIGUOUS, POINTER       :: xzcount => NULL(), yzcount => NULL(), xzdispl => NULL(), yzdispl => NULL()
-      INTEGER                              :: in = 0, mip = -1
+      LOGICAL :: in = .FALSE.
+      INTEGER                              :: mip = -1
       REAL(KIND=dp)                        :: rsratio = 1.0_dp
       COMPLEX(KIND=dp), DIMENSION(:), POINTER, CONTIGUOUS &
          :: xzbuf => NULL(), yzbuf => NULL()
@@ -119,6 +139,7 @@ MODULE fft_tools
    ! END of types for the pool of scratch data needed in FFT routines
 
    PRIVATE
+   PUBLIC :: fft_size_type
    PUBLIC :: init_fft, fft3d, finalize_fft
    PUBLIC :: fft_alloc, fft_dealloc
    PUBLIC :: fft_radix_operations, fft_fw1d
@@ -1647,7 +1668,7 @@ CONTAINS
 
 ! If the send and recv counts are not already cached, then
 ! calculate and store them
-      IF (fft_scratch%in == 0) THEN
+      IF (.NOT. fft_scratch%in) THEN
 
          scount = 0
 
@@ -1700,7 +1721,7 @@ CONTAINS
          CALL group%sum(icrs)
          fft_scratch%rsratio = REAL(icrs, KIND=dp)/(REAL(2*np, KIND=dp)*REAL(np, KIND=dp))
 
-         fft_scratch%in = 1
+         fft_scratch%in = .TRUE.
       ELSE
          scount = fft_scratch%yzcount
          rcount = fft_scratch%xzcount
@@ -1853,7 +1874,7 @@ CONTAINS
 
 ! If the send and recv counts are not already cached, then
 ! calculate and store them
-      IF (fft_scratch%in == 0) THEN
+      IF (.NOT. fft_scratch%in) THEN
 
          rcount = 0
          nx = MAXVAL(bo(2, 1, :))
@@ -1898,7 +1919,7 @@ CONTAINS
          CALL group%sum(icrs)
          fft_scratch%rsratio = REAL(icrs, KIND=dp)/(REAL(2*np, KIND=dp)*REAL(np, KIND=dp))
 
-         fft_scratch%in = 1
+         fft_scratch%in = .TRUE.
       ELSE
          scount = fft_scratch%xzcount
          rcount = fft_scratch%yzcount
@@ -2719,7 +2740,7 @@ CONTAINS
       IF (ASSOCIATED(fft_scratch%xzcount)) THEN
          DEALLOCATE (fft_scratch%xzcount, fft_scratch%yzcount)
          DEALLOCATE (fft_scratch%xzdispl, fft_scratch%yzdispl)
-         fft_scratch%in = 0
+         fft_scratch%in = .FALSE.
          fft_scratch%rsratio = 1._dp
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf1)) THEN
@@ -3313,5 +3334,59 @@ CONTAINS
       CALL group%sync()
 
    END SUBROUTINE sparse_alltoall
+
+! **************************************************************************************************
+!> \brief  test data structures for equality. It is assumed that if they are
+!>         different for one mpi task they are different for all (??)
+!> \param this ...
+!> \param other ...
+!> \return ...
+! **************************************************************************************************
+   ELEMENTAL FUNCTION fft_size_is_equal(this, other) RESULT(equal)
+      CLASS(fft_size_type), INTENT(IN)                    :: this, other
+      LOGICAL                                            :: equal
+
+      equal = .TRUE.
+
+      equal = equal .AND. this%nx == other%nx
+      equal = equal .AND. this%ny == other%ny
+      equal = equal .AND. this%nz == other%nz
+
+      equal = equal .AND. this%lmax == other%lmax
+      equal = equal .AND. this%mmax == other%mmax
+      equal = equal .AND. this%nmax == other%nmax
+
+      equal = equal .AND. this%mx1 == other%mx1
+      equal = equal .AND. this%mx2 == other%mx2
+      equal = equal .AND. this%mx3 == other%mx3
+
+      equal = equal .AND. this%my1 == other%my1
+      equal = equal .AND. this%my2 == other%my2
+      equal = equal .AND. this%my3 == other%my3
+
+      equal = equal .AND. this%mcz1 == other%mcz1
+      equal = equal .AND. this%mcx2 == other%mcx2
+      equal = equal .AND. this%mcz2 == other%mcz2
+      equal = equal .AND. this%mcy3 == other%mcy3
+
+      equal = equal .AND. this%lg == other%lg
+      equal = equal .AND. this%mg == other%mg
+
+      equal = equal .AND. this%nbx == other%nbx
+      equal = equal .AND. this%nbz == other%nbz
+
+      equal = equal .AND. this%nmray == other%nmray
+      equal = equal .AND. this%nyzray == other%nyzray
+
+      equal = equal .AND. this%gs_group == other%gs_group
+      equal = equal .AND. this%rs_group == other%rs_group
+
+      equal = equal .AND. ALL(this%g_pos == other%g_pos)
+      equal = equal .AND. ALL(this%r_pos == other%r_pos)
+      equal = equal .AND. ALL(this%r_dim == other%r_dim)
+
+      equal = equal .AND. this%numtask == other%numtask
+
+   END FUNCTION fft_size_is_equal
 
 END MODULE fft_tools
