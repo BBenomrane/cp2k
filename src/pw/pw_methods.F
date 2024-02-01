@@ -28,7 +28,7 @@ MODULE pw_methods
                               cp_to_string
    USE fft_tools, ONLY: BWFFT, &
                         FWFFT, &
-                        fft3d
+                        fft3d, fft_alloc, fft_dealloc
    USE kahan_sum, ONLY: accurate_dot_product, &
                         accurate_sum
    USE kinds, ONLY: dp
@@ -1240,18 +1240,18 @@ CONTAINS
                                           CALL fft3d(FWFFT, n, c_out, scale=norm, debug=test)
                                        #:elif kind=="c3d" and kind2=="c1d"
                                           c_in => pw1%array
-                                          ALLOCATE (c_out(n(1), n(2), n(3)))
+                                          CALL fft_alloc(c_out, [n(1), n(2), n(3)])
                                           ! transform
                                           CALL fft3d(FWFFT, n, c_in, c_out, scale=norm, debug=test)
                                           ! gather results
                                           IF (test .AND. out_unit > 0) WRITE (out_unit, '(A)') "  PW_GATHER : 3d -> 1d "
                                           CALL pw_gather_s_${kind2}$_c3d(pw2, c_out)
-                                          DEALLOCATE (c_out)
+                                          CALL fft_dealloc(c_out)
                                        #:elif kind=="r3d" and kind2=="c1d"
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
                                           CALL pw_gpu_r3dc1d_3d(pw1, pw2, scale=norm)
 #elif defined (__PW_FPGA)
-                                          ALLOCATE (c_out(n(1), n(2), n(3)))
+                                          CALL fft_alloc(c_out, [n(1), n(2), n(3)])
                                           ! check if bitstream for the fft size is present
                                           ! if not, perform fft3d in CPU
                                           IF (pw_fpga_init_bitstream(n) == 1) THEN
@@ -1268,13 +1268,13 @@ CONTAINS
                                              CALL fft3d(FWFFT, n, c_out, scale=norm, debug=test)
                                              CALL pw_gather_s_${kind2}$_c3d(pw2, c_out)
                                           END IF
-                                          DEALLOCATE (c_out)
+                                          CALL fft_dealloc(c_out)
 #else
-                                          ALLOCATE (c_out(n(1), n(2), n(3)))
+                                          CALL fft_alloc(c_out, [n(1), n(2), n(3)])
                                           CALL pw_copy_to_array(pw1, c_out)
                                           CALL fft3d(FWFFT, n, c_out, scale=norm, debug=test)
                                           CALL pw_gather_s_${kind2}$_c3d(pw2, c_out)
-                                          DEALLOCATE (c_out)
+                                          CALL fft_dealloc(c_out)
 #endif
                                        #:endif
                                     #:else
@@ -1284,12 +1284,12 @@ CONTAINS
                                           CALL fft3d(BWFFT, n, c_in, c_out, scale=norm, debug=test)
                                        #:elif kind=="c3d" and kind2=="r3d"
                                           c_in => pw1%array
-                                          ALLOCATE (c_out(n(1), n(2), n(3)))
+                                          CALL fft_alloc(c_out, [n(1), n(2), n(3)])
                                           CALL fft3d(BWFFT, n, c_in, c_out, scale=norm, debug=test)
                                           ! use real part only
                                           IF (test .AND. out_unit > 0) WRITE (out_unit, '(A)') "  REAL part "
                                           pw2%array = REAL(c_out, KIND=dp)
-                                          DEALLOCATE (c_out)
+                                          CALL fft_dealloc(c_out)
                                        #:elif kind=="c1d" and kind2=="c3d"
                                           c_out => pw2%array
                                           IF (test .AND. out_unit > 0) WRITE (out_unit, '(A)') "  PW_SCATTER : 3d -> 1d "
@@ -1299,7 +1299,7 @@ CONTAINS
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
                                           CALL pw_gpu_c1dr3d_3d(pw1, pw2, scale=norm)
 #elif defined (__PW_FPGA)
-                                          ALLOCATE (c_out(n(1), n(2), n(3)))
+                                          CALL fft_alloc(c_out, [n(1), n(2), n(3)])
                                           ! check if bitstream for the fft size is present
                                           ! if not, perform fft3d in CPU
                                           IF (pw_fpga_init_bitstream(n) == 1) THEN
@@ -1322,9 +1322,9 @@ CONTAINS
                                              IF (test .AND. out_unit > 0) WRITE (out_unit, '(A)') "  REAL part "
                                              CALL pw_copy_from_array(pw2, c_out)
                                           END IF
-                                          DEALLOCATE (c_out)
+                                          CALL fft_dealloc(c_out)
 #else
-                                          ALLOCATE (c_out(n(1), n(2), n(3)))
+                                          CALL fft_alloc(c_out, [n(1), n(2), n(3)])
                                           IF (test .AND. out_unit > 0) WRITE (out_unit, '(A)') "  PW_SCATTER : 3d -> 1d "
                                           CALL pw_scatter_s_${kind}$_c3d(pw1, c_out)
                                           ! transform
@@ -1332,7 +1332,7 @@ CONTAINS
                                           ! use real part only
                                           IF (test .AND. out_unit > 0) WRITE (out_unit, '(A)') "  REAL part "
                                           CALL pw_copy_from_array(pw2, c_out)
-                                          DEALLOCATE (c_out)
+                                          CALL fft_dealloc(c_out)
 #endif
                                        #:endif
                                     #:endif
@@ -1392,7 +1392,7 @@ CONTAINS
 #endif
 !..   prepare input
                                              nloc = pw1%pw_grid%npts_local
-                                             ALLOCATE (c_in(nloc(1), nloc(2), nloc(3)))
+                                             CALL fft_alloc(c_in, [nloc(1), nloc(2), nloc(3)])
                                              CALL pw_copy_to_array(pw1, c_in)
                                              grays = z_zero
                                              !..transform
@@ -1409,7 +1409,7 @@ CONTAINS
                                              IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
                                                 WRITE (out_unit, '(A)') "  PW_GATHER : 2d -> 1d "
                                              CALL pw_gather_p_${kind2}$ (pw2, grays)
-                                             DEALLOCATE (c_in)
+                                             CALL fft_dealloc(c_in)
 
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
                                           END IF
@@ -1448,7 +1448,7 @@ CONTAINS
                                              grays = z_zero
                                              CALL pw_scatter_p_${kind}$ (pw1, grays)
                                              nloc = pw2%pw_grid%npts_local
-                                             ALLOCATE (c_in(nloc(1), nloc(2), nloc(3)))
+                                             CALL fft_alloc(c_in, [nloc(1), nloc(2), nloc(3)])
                                              !..transform
                                              IF (pw1%pw_grid%para%ray_distribution) THEN
                                                 CALL fft3d(BWFFT, n, c_in, grays, pw1%pw_grid%para%group, &
@@ -1463,7 +1463,7 @@ CONTAINS
                                              IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
                                                 WRITE (out_unit, '(A)') "  Real part "
                                              CALL pw_copy_from_array(pw2, c_in)
-                                             DEALLOCATE (c_in)
+                                             CALL fft_dealloc(c_in)
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
                                           END IF
 #endif
