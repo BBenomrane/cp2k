@@ -50,47 +50,55 @@ MODULE fftw3_lib
       MODULE PROCEDURE :: fftw_alloc_complex_1d
       MODULE PROCEDURE :: fftw_alloc_complex_2d
       MODULE PROCEDURE :: fftw_alloc_complex_3d
+      MODULE PROCEDURE :: fftw_alloc_real_1d
+      MODULE PROCEDURE :: fftw_alloc_real_2d
+      MODULE PROCEDURE :: fftw_alloc_real_3d
    END INTERFACE
 
    INTERFACE fftw_dealloc
       MODULE PROCEDURE :: fftw_dealloc_complex_1d
       MODULE PROCEDURE :: fftw_dealloc_complex_2d
       MODULE PROCEDURE :: fftw_dealloc_complex_3d
+      MODULE PROCEDURE :: fftw_dealloc_real_1d
+      MODULE PROCEDURE :: fftw_dealloc_real_2d
+      MODULE PROCEDURE :: fftw_dealloc_real_3d
    END INTERFACE
 
 CONTAINS
 
    #:set maxdim = 3
-   #:for dim in range(1, maxdim+1)
+   #:for kind, type in [("real", "REAL(C_DOUBLE)"), ("complex", "COMPLEX(C_DOUBLE_COMPLEX)")]
+      #:for dim in range(1, maxdim+1)
 ! Concatenate the components of the dimensions passed to this function to use it if FFTW3 is not used
-      #:set dim_extended = ", ".join(["n("+str(i)+")" for i in range(1, dim+1)])
-      SUBROUTINE fftw_alloc_complex_${dim}$d(array, n)
-         COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:${", :"*(dim-1)}$), CONTIGUOUS, POINTER, INTENT(OUT) :: array
-         INTEGER, DIMENSION(${dim}$), INTENT(IN) :: n
+         #:set dim_extended = ", ".join(["n("+str(i)+")" for i in range(1, dim+1)])
+         SUBROUTINE fftw_alloc_${kind}$_${dim}$d(array, n)
+            ${type}$, DIMENSION(:${", :"*(dim-1)}$), CONTIGUOUS, POINTER, INTENT(OUT) :: array
+            INTEGER, DIMENSION(${dim}$), INTENT(IN) :: n
 
 #if defined(__FFTW3)
-         TYPE(C_PTR) :: data_ptr
-         data_ptr = fftw_alloc_complex(INT(PRODUCT(n), KIND=C_SIZE_T))
-         CALL C_F_POINTER(data_ptr, array, n)
+            TYPE(C_PTR) :: data_ptr
+            data_ptr = fftw_alloc_${kind}$ (INT(PRODUCT(n), KIND=C_SIZE_T))
+            CALL C_F_POINTER(data_ptr, array, n)
 #else
 ! Just allocate the array
-         ALLOCATE (array(${dim_extended}$))
+            ALLOCATE (array(${dim_extended}$))
 #endif
 
-      END SUBROUTINE fftw_alloc_complex_${dim}$d
+         END SUBROUTINE fftw_alloc_${kind}$_${dim}$d
 
-      SUBROUTINE fftw_dealloc_complex_${dim}$d(array)
-         COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:${", :"*(dim-1)}$), CONTIGUOUS, POINTER, INTENT(INOUT) :: array
+         SUBROUTINE fftw_dealloc_${kind}$_${dim}$d(array)
+            ${type}$, DIMENSION(:${", :"*(dim-1)}$), CONTIGUOUS, POINTER, INTENT(INOUT) :: array
 
 #if defined(__FFTW3)
-         CALL fftw_free(C_LOC(array))
-         NULLIFY (array)
+            CALL fftw_free(C_LOC(array))
+            NULLIFY (array)
 #else
 ! Just deallocate the array
-         DEALLOCATE (array)
+            DEALLOCATE (array)
 #endif
 
-      END SUBROUTINE fftw_dealloc_complex_${dim}$d
+         END SUBROUTINE fftw_dealloc_${kind}$_${dim}$d
+      #:endfor
    #:endfor
 
 #if defined ( __FFTW3 )

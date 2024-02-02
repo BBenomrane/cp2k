@@ -2700,13 +2700,13 @@ CONTAINS
                      fft_scratch%sdispl, fft_scratch%rdispl)
       END IF
       IF (ASSOCIATED(fft_scratch%rr)) THEN
-         DEALLOCATE (fft_scratch%rr)
+         CALL fft_dealloc(fft_scratch%rr)
       END IF
       IF (ASSOCIATED(fft_scratch%xzbuf)) THEN
-         DEALLOCATE (fft_scratch%xzbuf)
+         CALL fft_dealloc(fft_scratch%xzbuf)
       END IF
       IF (ASSOCIATED(fft_scratch%yzbuf)) THEN
-         DEALLOCATE (fft_scratch%yzbuf)
+         CALL fft_dealloc(fft_scratch%yzbuf)
       END IF
       IF (ASSOCIATED(fft_scratch%xzbuf_sgl)) THEN
          DEALLOCATE (fft_scratch%xzbuf_sgl)
@@ -2739,22 +2739,22 @@ CONTAINS
          fft_scratch%rsratio = 1._dp
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf1)) THEN
-         DEALLOCATE (fft_scratch%rbuf1)
+         CALL fft_dealloc(fft_scratch%rbuf1)
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf2)) THEN
-         DEALLOCATE (fft_scratch%rbuf2)
+         CALL fft_dealloc(fft_scratch%rbuf2)
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf3)) THEN
-         DEALLOCATE (fft_scratch%rbuf3)
+         CALL fft_dealloc(fft_scratch%rbuf3)
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf4)) THEN
-         DEALLOCATE (fft_scratch%rbuf4)
+         CALL fft_dealloc(fft_scratch%rbuf4)
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf5)) THEN
-         DEALLOCATE (fft_scratch%rbuf5)
+         CALL fft_dealloc(fft_scratch%rbuf5)
       END IF
       IF (ASSOCIATED(fft_scratch%rbuf6)) THEN
-         DEALLOCATE (fft_scratch%rbuf6)
+         CALL fft_dealloc(fft_scratch%rbuf6)
       END IF
 
       IF (fft_scratch%cart_sub_comm(1) /= mp_comm_null) THEN
@@ -2887,6 +2887,7 @@ CONTAINS
       INTEGER, DIMENSION(3)                    :: pcoord
       LOGICAL                                  :: equal
       LOGICAL, DIMENSION(2)                    :: dims
+      COMPLEX(KIND=dp), DIMENSION(:, :), POINTER, CONTIGUOUS :: rbuf
       TYPE(fft_scratch_pool_type), POINTER     :: fft_scratch_current, &
                                                   fft_scratch_last, &
                                                   fft_scratch_new
@@ -2980,10 +2981,14 @@ CONTAINS
                mcx2 = fft_sizes%mcx2
                mcz2 = fft_sizes%mcz2
                mcy3 = fft_sizes%mcy3
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf1(mx2*my1*mcz2, 0:DIM(2) - 1))
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf2(mx1*my1*mcz2, 0:DIM(2) - 1))
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf3(mx2*mz3*mcy3, 0:DIM(1) - 1))
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf4(mx2*mz2*mcy3, 0:DIM(1) - 1))
+               CALL fft_alloc(rbuf, [mx2*my1*mcx2, DIM(2)])
+               fft_scratch_new%fft_scratch%rbuf1(1:mx2*my1*mcz2, 0:DIM(2) - 1) => rbuf
+               CALL fft_alloc(rbuf, [mx1*my1*mcz2, DIM(2)])
+               fft_scratch_new%fft_scratch%rbuf2(1:mx1*my1*mcz2, 0:DIM(2) - 1) => rbuf
+               CALL fft_alloc(rbuf, [mx2*mz3*mcy3, DIM(1)])
+               fft_scratch_new%fft_scratch%rbuf3(1:mx2*mz3*mcy3, 0:DIM(1) - 1) => rbuf
+               CALL fft_alloc(rbuf, [mx2*mz2*mcy3, DIM(1)])
+               fft_scratch_new%fft_scratch%rbuf4(1:mx2*mz2*mcy3, 0:DIM(1) - 1) => rbuf
 
                dims = (/.TRUE., .FALSE./)
                CALL fft_scratch_new%fft_scratch%cart_sub_comm(1)%from_sub(fft_sizes%rs_group, dims)
@@ -3034,8 +3039,10 @@ CONTAINS
                fft_scratch_new%fft_scratch%dim = dim
                fft_scratch_new%fft_scratch%pos = pos
                mcy3 = fft_sizes%mcy3
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf5(mx1*mz3*mcy3, 0:DIM(1) - 1))
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf6(mx1*mz1*mcy3, 0:DIM(1) - 1))
+               CALL fft_alloc(rbuf, [mx1*mz3*mcy3, DIM(1)])
+               fft_scratch_new%fft_scratch%rbuf5(1:mx1*mz3*mcy3, 0:DIM(1) - 1) => rbuf
+               CALL fft_alloc(rbuf, [mx1*mz1*mcy3, DIM(1)])
+               fft_scratch_new%fft_scratch%rbuf6(1:mx1*mz1*mcy3, 0:DIM(1) - 1) => rbuf
 
                !set up fft plans
                CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(1), fft_type, FWFFT, .TRUE., n(3), mx1*my1, &
@@ -3083,7 +3090,8 @@ CONTAINS
                   ALLOCATE (fft_scratch_new%fft_scratch%ss(mmax, lmax))
                   ALLOCATE (fft_scratch_new%fft_scratch%tt(nm, 0:np - 1))
                ELSE
-                  ALLOCATE (fft_scratch_new%fft_scratch%rr(nm, 0:np - 1))
+                  CALL fft_alloc(rbuf, [nm, np])
+                  fft_scratch_new%fft_scratch%rr(1:nm, 0:np - 1) => rbuf
                END IF
 
                !set up fft plans
@@ -3149,8 +3157,8 @@ CONTAINS
                   ALLOCATE (fft_scratch_new%fft_scratch%yzbuf_sgl(mg*lg))
                   ALLOCATE (fft_scratch_new%fft_scratch%xzbuf_sgl(n(2)*mx2*mz2))
                ELSE
-                  ALLOCATE (fft_scratch_new%fft_scratch%yzbuf(mg*lg))
-                  ALLOCATE (fft_scratch_new%fft_scratch%xzbuf(n(2)*mx2*mz2))
+                  CALL fft_alloc(fft_scratch_new%fft_scratch%yzbuf, [mg*lg])
+                  CALL fft_alloc(fft_scratch_new%fft_scratch%xzbuf, [n(2)*mx2*mz2])
                END IF
                ALLOCATE (fft_scratch_new%fft_scratch%pgrid(0:m1 - 1, 0:m2 - 1))
                ALLOCATE (fft_scratch_new%fft_scratch%xcor(nbx))
@@ -3169,8 +3177,10 @@ CONTAINS
                fft_scratch_new%fft_scratch%pos = pos
                mcz1 = fft_sizes%mcz1
                mcz2 = fft_sizes%mcz2
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf1(mx2*my1*mcz2, 0:DIM(2) - 1))
-               ALLOCATE (fft_scratch_new%fft_scratch%rbuf2(mx1*my1*mcz2, 0:DIM(2) - 1))
+               CALL fft_alloc(rbuf, [mx2*my1*mcz2, DIM(2)])
+               fft_scratch_new%fft_scratch%rbuf1(1:mx2*my1*mcz2, 0:DIM(2) - 1) => rbuf
+               CALL fft_alloc(rbuf, [mx1*my1*mcz2, DIM(2)])
+               fft_scratch_new%fft_scratch%rbuf2(1:mx1*my1*mcz2, 0:DIM(2) - 1) => rbuf
 
                dims = (/.FALSE., .TRUE./)
                CALL fft_scratch_new%fft_scratch%cart_sub_comm(2)%from_sub(fft_sizes%rs_group, dims)
