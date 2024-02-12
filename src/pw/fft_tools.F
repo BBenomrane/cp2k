@@ -59,13 +59,16 @@ MODULE fft_tools
    ! keep the subroutine "is_equal" up-to-date
    ! needs a default initialization
    TYPE fft_scratch_sizes
-      INTEGER                              :: nx = 0, ny = 0, nz = 0
-      INTEGER                              :: lmax = 0, mmax = 0, nmax = 0
+      INTEGER, DIMENSION(3)                :: shape_r = 0
+      INTEGER, DIMENSION(3)                :: max_dims = 0
+      ! Sizes of local blocks within each step
       INTEGER                              :: mx1 = 0, mx2 = 0, mx3 = 0
       INTEGER                              :: my1 = 0, my2 = 0, my3 = 0
       INTEGER                              :: mz1 = 0, mz2 = 0, mz3 = 0
+      ! ???
       INTEGER                              :: mcz1 = 0, mcz2 = 0, mcy3 = 0, mcx2 = 0
-      INTEGER                              :: lg = 0, mg = 0
+      ! Required for ps
+      INTEGER, DIMENSION(2)                :: shape_g = 0
       INTEGER                              :: nbx = 0, nbz = 0
       INTEGER                              :: nmray = 0, nyzray = 0
       TYPE(mp_comm_type)                   :: gs_group = mp_comm_type()
@@ -520,9 +523,9 @@ CONTAINS
          POINTER                                         :: pbuf, qbuf, rbuf, sbuf
       COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
          POINTER                                         :: tbuf
-      INTEGER :: g_pos, handle, lg, lmax, mcx2, mcz1, mcz2, mg, mmax, mx1, mx2, my1, mz2, n1, n2, &
-         nmax, numtask, numtask_g, numtask_r, nx, ny, nz, output_unit, r_dim(2), r_pos(2), rp, &
-         sign, stat
+      INTEGER :: g_pos, handle, max_dims(3), mcx2, mcz1, mcz2, mx1, mx2, my1, mz2, n1, n2, &
+         numtask, numtask_g, numtask_r, output_unit, r_dim(2), r_pos(2), rp, shape_g(2), &
+         shape_r(3), sign, stat
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
       LOGICAL                                            :: test
       REAL(KIND=dp)                                      :: norm, sum_data
@@ -556,19 +559,11 @@ CONTAINS
 
       sign = fsign
 
-      lg = SIZE(gin, 1)
-      mg = SIZE(gin, 2)
+      shape_g = SHAPE(gin)
+      shape_r = SHAPE(cin)
 
-      nx = SIZE(cin, 1)
-      ny = SIZE(cin, 2)
-      nz = SIZE(cin, 3)
-
-      IF (mg == 0) THEN
-         mmax = 1
-      ELSE
-         mmax = mg
-      END IF
-      lmax = MAX(lg, (nx*ny*nz)/mmax + 1)
+      max_dims(2) = MAX(1, shape_g(2))
+      max_dims(1) = MAX(shape_g(1), PRODUCT(shape_r)/max_dims(2) + 1)
 
       ALLOCATE (p2p(0:numtask - 1))
 
@@ -582,22 +577,17 @@ CONTAINS
 
       n1 = MAXVAL(bo(2, 1, :, 1) - bo(1, 1, :, 1) + 1)
       n2 = MAXVAL(bo(2, 2, :, 1) - bo(1, 2, :, 1) + 1)
-      nmax = MAX((2*n2)/numtask, 2)*mx2*mz2
-      nmax = MAX(nmax, n1*MAXVAL(nyzray))
+      max_dims(3) = MAX(MAX((2*n2)/numtask, 2)*mx2*mz2, n1*MAXVAL(nyzray))
       n1 = MAXVAL(bo(2, 1, :, 2))
       n2 = MAXVAL(bo(2, 3, :, 2))
 
-      fft_scratch_size%nx = nx
-      fft_scratch_size%ny = ny
-      fft_scratch_size%nz = nz
-      fft_scratch_size%lmax = lmax
-      fft_scratch_size%mmax = mmax
+      fft_scratch_size%shape_r = shape_r
+      fft_scratch_size%max_dims = max_dims
       fft_scratch_size%mx1 = mx1
       fft_scratch_size%mx2 = mx2
       fft_scratch_size%my1 = my1
       fft_scratch_size%mz2 = mz2
-      fft_scratch_size%lg = lg
-      fft_scratch_size%mg = mg
+      fft_scratch_size%shape_g = shape_g
       fft_scratch_size%nbx = n1
       fft_scratch_size%nbz = n2
       mcz1 = MAXVAL(bo(2, 3, :, 1) - bo(1, 3, :, 1) + 1)
@@ -606,7 +596,6 @@ CONTAINS
       fft_scratch_size%mcz1 = mcz1
       fft_scratch_size%mcx2 = mcx2
       fft_scratch_size%mcz2 = mcz2
-      fft_scratch_size%nmax = nmax
       fft_scratch_size%nmray = MAXVAL(nyzray)
       fft_scratch_size%nyzray = nyzray(g_pos)
       fft_scratch_size%gs_group = gs_group
@@ -620,8 +609,8 @@ CONTAINS
          IF (g_pos == 0 .AND. output_unit > 0) THEN
             WRITE (output_unit, '(A)') "  Parallel 3D FFT : fft3d_ps"
             WRITE (output_unit, '(A,T60,3I7)') "     Transform lengths ", n
-            WRITE (output_unit, '(A,T67,2I7)') "     Array dimensions (gin) ", lg, mg
-            WRITE (output_unit, '(A,T60,3I7)') "     Array dimensions (cin) ", nx, ny, nz
+            WRITE (output_unit, '(A,T67,2I7)') "     Array dimensions (gin) ", shape_g
+            WRITE (output_unit, '(A,T60,3I7)') "     Array dimensions (cin) ", shape_r
          END IF
       END IF
 
@@ -830,7 +819,7 @@ CONTAINS
                CALL gs_group%sum(sum_data)
                IF (g_pos == 0 .AND. output_unit > 0) THEN
                   WRITE (output_unit, '(A)') "     One step communication algorithm "
-                  WRITE (output_unit, '(A,T60,3I7)') "     Transform YZ ", n(2), n(3), nx
+                  WRITE (output_unit, '(A,T60,3I7)') "     Transform YZ ", n(2), n(3), shape_r(1)
                   WRITE (output_unit, '(A,T67,2I7)') "     Transform X ", n(1), nyzray(g_pos)
                   WRITE (output_unit, '(A,T61,E20.14)') "     Sum of data(1) ", sum_data
                END IF
@@ -879,7 +868,7 @@ CONTAINS
                IF (g_pos == 0 .AND. output_unit > 0) THEN
                   WRITE (output_unit, '(A)') "  One step communication algorithm "
                   WRITE (output_unit, '(A,T67,2I7)') "     Transform X ", n(1), nyzray(g_pos)
-                  WRITE (output_unit, '(A,T60,3I7)') "     Transform YZ ", n(2), n(3), nx
+                  WRITE (output_unit, '(A,T60,3I7)') "     Transform YZ ", n(2), n(3), shape_r(1)
                   WRITE (output_unit, '(A,T61,E20.14)') "     Sum of data(1) ", sum_data
                END IF
             END IF
@@ -2881,9 +2870,9 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'get_fft_scratch'
 
-      INTEGER :: coord(2), DIM(2), handle, i, ix, iz, lg, lmax, m1, m2, &
-                 mcx2, mcy3, mcz1, mcz2, mg, mmax, mx1, mx2, my1, my3, mz1, mz2, mz3, &
-                 nbx, nbz, nm, nmax, nmray, np, nx, ny, nyzray, nz, pos(2)
+      INTEGER :: coord(2), DIM(2), handle, i, ix, iz, m1, m2, &
+                 mcx2, mcy3, mcz1, mcz2, mx1, mx2, my1, my3, mz1, mz2, mz3, &
+                 shape_r(3), nbx, nbz, nm, nmray, np, nyzray, pos(2), shape_g(2), max_dims(3)
       INTEGER, DIMENSION(3)                    :: pcoord
       LOGICAL                                  :: equal
       LOGICAL, DIMENSION(2)                    :: dims
@@ -3059,35 +3048,31 @@ CONTAINS
                                         fft_scratch_new%fft_scratch%a3buf, fft_scratch_new%fft_scratch%a1buf, fft_plan_style)
 
             CASE (200) ! fft3d_ps: plane distribution
-               nx = fft_sizes%nx
-               ny = fft_sizes%ny
-               nz = fft_sizes%nz
+               shape_r = fft_sizes%shape_r
                mx2 = fft_sizes%mx2
-               lmax = fft_sizes%lmax
-               mmax = fft_sizes%mmax
-               lg = fft_sizes%lg
-               mg = fft_sizes%mg
+               max_dims = fft_sizes%max_dims
+               shape_g = fft_sizes%shape_g
                np = fft_sizes%numtask
                nmray = fft_sizes%nmray
                nyzray = fft_sizes%nyzray
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
-               length = INT(2*dp_size*MAX(mmax, 1)*MAX(lmax, 1), KIND=C_SIZE_T)
+               length = INT(2*dp_size*MAX(max_dims(2), 1)*MAX(max_dims(1), 1), KIND=C_SIZE_T)
                ierr = offload_malloc_pinned_mem(cptr_r1buf, length)
                CPASSERT(ierr == 0)
-               CALL c_f_pointer(cptr_r1buf, fft_scratch_new%fft_scratch%r1buf, (/MAX(mmax, 1), MAX(lmax, 1)/))
-               length = INT(2*dp_size*MAX(ny, 1)*MAX(nz, 1)*MAX(nx, 1), KIND=C_SIZE_T)
+               CALL c_f_pointer(cptr_r1buf, fft_scratch_new%fft_scratch%r1buf, [MAX(max_dims(2), 1), MAX(max_dims(1), 1)])
+               length = INT(2*dp_size*MAX(shape_r(1), 1)*MAX(shape_r(2), 1)*MAX(shape_r(3), 1), KIND=C_SIZE_T)
                ierr = offload_malloc_pinned_mem(cptr_tbuf, length)
                CPASSERT(ierr == 0)
-               CALL c_f_pointer(cptr_tbuf, fft_scratch_new%fft_scratch%tbuf, (/MAX(ny, 1), MAX(nz, 1), MAX(nx, 1)/))
+       CALL c_f_pointer(cptr_tbuf, fft_scratch_new%fft_scratch%tbuf, (/MAX(shape_r(2), 1), MAX(shape_r(3), 1), MAX(shape_r(1), 1)/))
 #else
-               CALL fft_alloc(fft_scratch_new%fft_scratch%r1buf, [mmax, lmax])
-               CALL fft_alloc(fft_scratch_new%fft_scratch%tbuf, [ny, nz, nx])
+               CALL fft_alloc(fft_scratch_new%fft_scratch%r1buf, [max_dims(2), max_dims(1)])
+               CALL fft_alloc(fft_scratch_new%fft_scratch%tbuf, [shape_r(2), shape_r(3), shape_r(1)])
 #endif
                fft_scratch_new%fft_scratch%group = fft_sizes%gs_group
-               CALL fft_alloc(fft_scratch_new%fft_scratch%r2buf, [lg, mg])
+               CALL fft_alloc(fft_scratch_new%fft_scratch%r2buf, shape_g)
                nm = nmray*mx2
                IF (alltoall_sgl) THEN
-                  ALLOCATE (fft_scratch_new%fft_scratch%ss(mmax, lmax))
+                  ALLOCATE (fft_scratch_new%fft_scratch%ss(max_dims(2), max_dims(1)))
                   ALLOCATE (fft_scratch_new%fft_scratch%tt(nm, 0:np - 1))
                ELSE
                   CALL fft_alloc(rbuf, [nm, np])
@@ -3095,17 +3080,17 @@ CONTAINS
                END IF
 
                !set up fft plans
-               CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(1), fft_type, FWFFT, .TRUE., nz, nx*ny, &
+     CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(1), fft_type, FWFFT, .TRUE., shape_r(3), shape_r(1)*shape_r(2), &
                                         fft_scratch_new%fft_scratch%tbuf, fft_scratch_new%fft_scratch%r1buf, fft_plan_style)
-               CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(2), fft_type, FWFFT, .TRUE., ny, nx*nz, &
+     CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(2), fft_type, FWFFT, .TRUE., shape_r(2), shape_r(1)*shape_r(3), &
                                         fft_scratch_new%fft_scratch%r1buf, fft_scratch_new%fft_scratch%tbuf, fft_plan_style)
                CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(3), fft_type, FWFFT, .TRUE., n(1), nyzray, &
                                         fft_scratch_new%fft_scratch%r1buf, fft_scratch_new%fft_scratch%r2buf, fft_plan_style)
                CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(4), fft_type, BWFFT, .TRUE., n(1), nyzray, &
                                         fft_scratch_new%fft_scratch%r2buf, fft_scratch_new%fft_scratch%r1buf, fft_plan_style)
-               CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(5), fft_type, BWFFT, .TRUE., ny, nx*nz, &
+     CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(5), fft_type, BWFFT, .TRUE., shape_r(2), shape_r(1)*shape_r(3), &
                                         fft_scratch_new%fft_scratch%tbuf, fft_scratch_new%fft_scratch%r1buf, fft_plan_style)
-               CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(6), fft_type, BWFFT, .TRUE., nz, nx*ny, &
+     CALL fft_create_plan_1dm(fft_scratch_new%fft_scratch%fft_plan(6), fft_type, BWFFT, .TRUE., shape_r(3), shape_r(1)*shape_r(2), &
                                         fft_scratch_new%fft_scratch%r1buf, fft_scratch_new%fft_scratch%tbuf, fft_plan_style)
 
             CASE (300) ! fft3d_ps: block distribution
@@ -3114,17 +3099,14 @@ CONTAINS
                my1 = fft_sizes%my1
                mz2 = fft_sizes%mz2
                mcx2 = fft_sizes%mcx2
-               lg = fft_sizes%lg
-               mg = fft_sizes%mg
-               nmax = fft_sizes%nmax
-               nmray = fft_sizes%nmray
+               shape_g = fft_sizes%shape_g
                nyzray = fft_sizes%nyzray
                m1 = fft_sizes%r_dim(1)
                m2 = fft_sizes%r_dim(2)
                nbx = fft_sizes%nbx
                nbz = fft_sizes%nbz
                CALL fft_alloc(fft_scratch_new%fft_scratch%p1buf, [mx1*my1, n(3)])
-               CALL fft_alloc(fft_scratch_new%fft_scratch%p6buf, [lg, mg])
+               CALL fft_alloc(fft_scratch_new%fft_scratch%p6buf, shape_g)
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
                length = INT(2*dp_size*MAX(n(3), 1)*MAX(mx1*my1, 1), KIND=C_SIZE_T)
                ierr = offload_malloc_pinned_mem(cptr_p2buf, length)
@@ -3142,22 +3124,22 @@ CONTAINS
                ierr = offload_malloc_pinned_mem(cptr_p5buf, length)
                CPASSERT(ierr == 0)
                CALL c_f_pointer(cptr_p5buf, fft_scratch_new%fft_scratch%p5buf, (/MAX(nyzray, 1), MAX(n(1), 1)/))
-               length = INT(2*dp_size*MAX(mg, 1)*MAX(lg, 1), KIND=C_SIZE_T)
+               length = INT(2*dp_size*PRODUCT(MAX(shape_g, 1)), KIND=C_SIZE_T)
                ierr = offload_malloc_pinned_mem(cptr_p7buf, length)
                CPASSERT(ierr == 0)
-               CALL c_f_pointer(cptr_p7buf, fft_scratch_new%fft_scratch%p7buf, (/MAX(mg, 1), MAX(lg, 1)/))
+               CALL c_f_pointer(cptr_p7buf, fft_scratch_new%fft_scratch%p7buf, [MAX(shape_g(2), 1), MAX(shape_g(1), 1)])
 #else
                CALL fft_alloc(fft_scratch_new%fft_scratch%p2buf, [n(3), mx1*my1])
                CALL fft_alloc(fft_scratch_new%fft_scratch%p3buf, [mx2*mz2, n(2)])
                CALL fft_alloc(fft_scratch_new%fft_scratch%p4buf, [n(2), mx2*mz2])
                CALL fft_alloc(fft_scratch_new%fft_scratch%p5buf, [nyzray, n(1)])
-               CALL fft_alloc(fft_scratch_new%fft_scratch%p7buf, [mg, lg])
+               CALL fft_alloc(fft_scratch_new%fft_scratch%p7buf, [shape_g(2), shape_g(1)])
 #endif
                IF (alltoall_sgl) THEN
-                  ALLOCATE (fft_scratch_new%fft_scratch%yzbuf_sgl(mg*lg))
+                  ALLOCATE (fft_scratch_new%fft_scratch%yzbuf_sgl(PRODUCT(shape_g)))
                   ALLOCATE (fft_scratch_new%fft_scratch%xzbuf_sgl(n(2)*mx2*mz2))
                ELSE
-                  CALL fft_alloc(fft_scratch_new%fft_scratch%yzbuf, [mg*lg])
+                  CALL fft_alloc(fft_scratch_new%fft_scratch%yzbuf, shape_g)
                   CALL fft_alloc(fft_scratch_new%fft_scratch%xzbuf, [n(2)*mx2*mz2])
                END IF
                ALLOCATE (fft_scratch_new%fft_scratch%pgrid(0:m1 - 1, 0:m2 - 1))
@@ -3355,13 +3337,8 @@ CONTAINS
 
       equal = .TRUE.
 
-      equal = equal .AND. fft_size_1%nx == fft_size_2%nx
-      equal = equal .AND. fft_size_1%ny == fft_size_2%ny
-      equal = equal .AND. fft_size_1%nz == fft_size_2%nz
-
-      equal = equal .AND. fft_size_1%lmax == fft_size_2%lmax
-      equal = equal .AND. fft_size_1%mmax == fft_size_2%mmax
-      equal = equal .AND. fft_size_1%nmax == fft_size_2%nmax
+      equal = equal .AND. ALL(fft_size_1%shape_r == fft_size_2%shape_r)
+      equal = equal .AND. ALL(fft_size_1%max_dims == fft_size_2%max_dims)
 
       equal = equal .AND. fft_size_1%mx1 == fft_size_2%mx1
       equal = equal .AND. fft_size_1%mx2 == fft_size_2%mx2
@@ -3376,8 +3353,7 @@ CONTAINS
       equal = equal .AND. fft_size_1%mcz2 == fft_size_2%mcz2
       equal = equal .AND. fft_size_1%mcy3 == fft_size_2%mcy3
 
-      equal = equal .AND. fft_size_1%lg == fft_size_2%lg
-      equal = equal .AND. fft_size_1%mg == fft_size_2%mg
+      equal = equal .AND. ALL(fft_size_1%shape_g == fft_size_2%shape_g)
 
       equal = equal .AND. fft_size_1%nbx == fft_size_2%nbx
       equal = equal .AND. fft_size_1%nbz == fft_size_2%nbz

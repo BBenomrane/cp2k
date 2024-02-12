@@ -225,11 +225,11 @@ CONTAINS
 
       COMPLEX(KIND=dp), DIMENSION(:, :), POINTER         :: grays, pbuf, qbuf, rbuf, sbuf
       COMPLEX(KIND=dp), DIMENSION(:, :, :), POINTER      :: tbuf
-      INTEGER                                            :: g_pos, handle, lg, lmax, mg, mmax, mx2, &
-                                                            mz2, n1, n2, ngpts, nmax, numtask, &
-                                                            numtask_g, numtask_r, rp
+      INTEGER                                            :: g_pos, handle, mx2, mz2, n1, n2, ngpts, &
+                                                            numtask, numtask_g, numtask_r, rp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
-      INTEGER, DIMENSION(2)                              :: r_dim, r_pos
+      INTEGER, DIMENSION(2)                              :: r_dim, r_pos, shape_g
+      INTEGER, DIMENSION(3)                              :: max_dims
       INTEGER, DIMENSION(:), POINTER                     :: n, nloc, nyzray
       INTEGER, DIMENSION(:, :, :, :), POINTER            :: bo
       TYPE(fft_scratch_sizes)                            :: fft_scratch_size
@@ -262,10 +262,9 @@ CONTAINS
          END IF
          numtask = numtask_r
 
-         lg = SIZE(grays, 1)
-         mg = SIZE(grays, 2)
-         mmax = MAX(mg, 1)
-         lmax = MAX(lg, (ngpts/mmax + 1))
+         shape_g = SHAPE(grays)
+         max_dims(2) = MAX(shape_g(2), 1)
+         max_dims(1) = MAX(shape_g(1), (ngpts/max_dims(2) + 1))
 
          ALLOCATE (p2p(0:numtask - 1))
 
@@ -276,26 +275,20 @@ CONTAINS
          mz2 = bo(2, 3, rp, 2) - bo(1, 3, rp, 2) + 1
          n1 = MAXVAL(bo(2, 1, :, 1) - bo(1, 1, :, 1) + 1)
          n2 = MAXVAL(bo(2, 2, :, 1) - bo(1, 2, :, 1) + 1)
-         nmax = MAX((2*n2)/numtask, 2)*mx2*mz2
-         nmax = MAX(nmax, n1*MAXVAL(nyzray))
+         max_dims(3) = MAX(MAX((2*n2)/numtask, 2)*mx2*mz2, n1*MAXVAL(nyzray))
 
-         fft_scratch_size%nx = nloc(1)
-         fft_scratch_size%ny = nloc(2)
-         fft_scratch_size%nz = nloc(3)
-         fft_scratch_size%lmax = lmax
-         fft_scratch_size%mmax = mmax
+         fft_scratch_size%shape_r = nloc
+         fft_scratch_size%max_dims = max_dims
          fft_scratch_size%mx1 = bo(2, 1, rp, 1) - bo(1, 1, rp, 1) + 1
          fft_scratch_size%mx2 = mx2
          fft_scratch_size%my1 = bo(2, 2, rp, 1) - bo(1, 2, rp, 1) + 1
          fft_scratch_size%mz2 = mz2
-         fft_scratch_size%lg = lg
-         fft_scratch_size%mg = mg
+         fft_scratch_size%shape_g = shape_g
          fft_scratch_size%nbx = MAXVAL(bo(2, 1, :, 2))
          fft_scratch_size%nbz = MAXVAL(bo(2, 3, :, 2))
          fft_scratch_size%mcz1 = MAXVAL(bo(2, 3, :, 1) - bo(1, 3, :, 1) + 1)
          fft_scratch_size%mcx2 = MAXVAL(bo(2, 1, :, 2) - bo(1, 1, :, 2) + 1)
          fft_scratch_size%mcz2 = MAXVAL(bo(2, 3, :, 2) - bo(1, 3, :, 2) + 1)
-         fft_scratch_size%nmax = nmax
          fft_scratch_size%nmray = MAXVAL(nyzray)
          fft_scratch_size%nyzray = nyzray(g_pos)
          fft_scratch_size%gs_group = gs_group
@@ -397,11 +390,11 @@ CONTAINS
 
       COMPLEX(KIND=dp), DIMENSION(:, :), POINTER         :: grays, pbuf, qbuf, rbuf, sbuf
       COMPLEX(KIND=dp), DIMENSION(:, :, :), POINTER      :: tbuf
-      INTEGER                                            :: g_pos, handle, lg, lmax, mg, mmax, mx2, &
-                                                            mz2, n1, n2, ngpts, nmax, numtask, &
-                                                            numtask_g, numtask_r, rp
+      INTEGER                                            :: g_pos, handle, mx2, mz2, n1, n2, ngpts, &
+                                                            numtask, numtask_g, numtask_r, rp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
-      INTEGER, DIMENSION(2)                              :: r_dim, r_pos
+      INTEGER, DIMENSION(2)                              :: r_dim, r_pos, shape_g
+      INTEGER, DIMENSION(3)                              :: max_dims
       INTEGER, DIMENSION(:), POINTER                     :: n, nloc, nyzray
       INTEGER, DIMENSION(:, :, :, :), POINTER            :: bo
       TYPE(fft_scratch_sizes)                            :: fft_scratch_size
@@ -434,10 +427,9 @@ CONTAINS
          END IF
          numtask = numtask_r
 
-         lg = SIZE(grays, 1)
-         mg = SIZE(grays, 2)
-         mmax = MAX(mg, 1)
-         lmax = MAX(lg, (ngpts/mmax + 1))
+         shape_g = SHAPE(grays)
+         max_dims(2) = MAX(shape_g(2), 1)
+         max_dims(1) = MAX(shape_g(1), (ngpts/max_dims(2) + 1))
 
          ALLOCATE (p2p(0:numtask - 1))
 
@@ -448,26 +440,20 @@ CONTAINS
          mz2 = bo(2, 3, rp, 2) - bo(1, 3, rp, 2) + 1
          n1 = MAXVAL(bo(2, 1, :, 1) - bo(1, 1, :, 1) + 1)
          n2 = MAXVAL(bo(2, 2, :, 1) - bo(1, 2, :, 1) + 1)
-         nmax = MAX((2*n2)/numtask, 2)*mx2*mz2
-         nmax = MAX(nmax, n1*MAXVAL(nyzray))
+         max_dims(3) = MAX(MAX((2*n2)/numtask, 2)*mx2*mz2, n1*MAXVAL(nyzray))
 
-         fft_scratch_size%nx = nloc(1)
-         fft_scratch_size%ny = nloc(2)
-         fft_scratch_size%nz = nloc(3)
-         fft_scratch_size%lmax = lmax
-         fft_scratch_size%mmax = mmax
+         fft_scratch_size%shape_r = nloc
+         fft_scratch_size%max_dims = max_dims
          fft_scratch_size%mx1 = bo(2, 1, rp, 1) - bo(1, 1, rp, 1) + 1
          fft_scratch_size%mx2 = mx2
          fft_scratch_size%my1 = bo(2, 2, rp, 1) - bo(1, 2, rp, 1) + 1
          fft_scratch_size%mz2 = mz2
-         fft_scratch_size%lg = lg
-         fft_scratch_size%mg = mg
+         fft_scratch_size%shape_g = shape_g
          fft_scratch_size%nbx = MAXVAL(bo(2, 1, :, 2))
          fft_scratch_size%nbz = MAXVAL(bo(2, 3, :, 2))
          fft_scratch_size%mcz1 = MAXVAL(bo(2, 3, :, 1) - bo(1, 3, :, 1) + 1)
          fft_scratch_size%mcx2 = MAXVAL(bo(2, 1, :, 2) - bo(1, 1, :, 2) + 1)
          fft_scratch_size%mcz2 = MAXVAL(bo(2, 3, :, 2) - bo(1, 3, :, 2) + 1)
-         fft_scratch_size%nmax = nmax
          fft_scratch_size%nmray = MAXVAL(nyzray)
          fft_scratch_size%nyzray = nyzray(g_pos)
          fft_scratch_size%gs_group = gs_group
