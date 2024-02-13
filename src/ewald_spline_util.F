@@ -28,9 +28,11 @@ MODULE ewald_spline_util
    USE pw_grid_types,                   ONLY: HALFSPACE,&
                                               pw_grid_type
    USE pw_grids,                        ONLY: pw_grid_create,&
+                                              pw_grid_release,&
                                               pw_grid_setup
    USE pw_methods,                      ONLY: pw_zero
    USE pw_pool_types,                   ONLY: pw_pool_create,&
+                                              pw_pool_release,&
                                               pw_pool_type
    USE pw_spline_utils,                 ONLY: &
         Eval_Interp_Spl3_pbc, Eval_d_Interp_Spl3_pbc, find_coeffs, pw_spline_do_precond, &
@@ -51,8 +53,6 @@ CONTAINS
 
 ! **************************************************************************************************
 !> \brief Setup of the G-space Ewald Term Spline Coefficients
-!> \param pw_grid ...
-!> \param pw_pool ...
 !> \param coeff ...
 !> \param LG ...
 !> \param gx ...
@@ -67,10 +67,8 @@ CONTAINS
 !>      12.2005 created [tlaino]
 !> \author Teodoro Laino
 ! **************************************************************************************************
-   SUBROUTINE Setup_Ewald_Spline(pw_grid, pw_pool, coeff, LG, gx, gy, gz, hmat, npts, &
+   SUBROUTINE Setup_Ewald_Spline(coeff, LG, gx, gy, gz, hmat, npts, &
                                  param_section, tag, print_section)
-      TYPE(pw_grid_type), POINTER                        :: pw_grid
-      TYPE(pw_pool_type), POINTER                        :: pw_pool
       TYPE(pw_r3d_rs_type), POINTER                      :: coeff
       REAL(KIND=dp), DIMENSION(:), POINTER               :: LG, gx, gy, gz
       REAL(KIND=dp), INTENT(IN)                          :: hmat(3, 3)
@@ -82,16 +80,16 @@ CONTAINS
       INTEGER                                            :: bo(2, 3), iounit
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cp_logger_type), POINTER                      :: logger
+      TYPE(pw_grid_type), POINTER                        :: pw_grid
+      TYPE(pw_pool_type), POINTER                        :: pw_pool
       TYPE(pw_r3d_rs_type)                               :: pw
 
 !
 ! Setting Up Fit Procedure
 !
 
-      CPASSERT(.NOT. ASSOCIATED(pw_grid))
-      CPASSERT(.NOT. ASSOCIATED(pw_pool))
       CPASSERT(.NOT. ASSOCIATED(coeff))
-      NULLIFY (cell)
+      NULLIFY (cell, pw_grid, pw_pool)
 
       CALL cell_create(cell, hmat=hmat, periodic=(/1, 1, 1/))
       CALL pw_grid_create(pw_grid, mp_comm_self)
@@ -114,6 +112,8 @@ CONTAINS
                          param_section=param_section, tag=tag)
       CALL pw_pool%give_back_pw(pw)
       CALL cell_release(cell)
+      CALL pw_pool_release(pw_pool)
+      CALL pw_grid_release(pw_grid)
 
    END SUBROUTINE Setup_Ewald_Spline
 

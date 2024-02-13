@@ -30,11 +30,7 @@ MODULE cp_ddapc_types
    USE mathconstants,                   ONLY: pi
    USE message_passing,                 ONLY: mp_para_env_type
    USE particle_types,                  ONLY: particle_type
-   USE pw_grid_types,                   ONLY: pw_grid_type
-   USE pw_grids,                        ONLY: pw_grid_release
    USE pw_poisson_types,                ONLY: pw_poisson_multipole
-   USE pw_pool_types,                   ONLY: pw_pool_release,&
-                                              pw_pool_type
    USE pw_types,                        ONLY: pw_c1d_gs_type,&
                                               pw_r3d_rs_type
 #include "./base/base_uses.f90"
@@ -69,8 +65,6 @@ MODULE cp_ddapc_types
       LOGICAL                                    :: do_property = .FALSE.
       LOGICAL                                    :: do_restraint = .FALSE.
       TYPE(section_vals_type), POINTER :: ewald_section => NULL()
-      TYPE(pw_pool_type), POINTER :: pw_pool_qm => NULL(), pw_pool_mm => NULL()
-      TYPE(pw_grid_type), POINTER :: pw_grid_qm => NULL(), pw_grid_mm => NULL()
       TYPE(pw_r3d_rs_type), POINTER :: coeff_qm => NULL(), coeff_mm => NULL()
    END TYPE cp_ddapc_ewald_type
 
@@ -241,14 +235,6 @@ CONTAINS
       output_unit = cp_logger_get_default_io_unit(logger)
       CPASSERT(.NOT. ASSOCIATED(cp_ddapc_ewald))
       ALLOCATE (cp_ddapc_ewald)
-      NULLIFY (cp_ddapc_ewald%pw_grid_mm, &
-               cp_ddapc_ewald%pw_grid_qm, &
-               cp_ddapc_ewald%ewald_section, &
-               cp_ddapc_ewald%pw_pool_mm, &
-               cp_ddapc_ewald%pw_pool_qm, &
-               cp_ddapc_ewald%coeff_mm, &
-               cp_ddapc_ewald%coeff_qm)
-      NULLIFY (multipole_section)
 
       poisson_section => section_vals_get_subs_vals(force_env_section, "DFT%POISSON")
       solvation_section => section_vals_get_subs_vals(force_env_section, "DFT%SCRF")
@@ -303,8 +289,7 @@ CONTAINS
             hmat = qm_cell%hmat
             CALL eval_lg(multipole_section, hmat, qm_cell%deth, LG, gx, gy, gz)
             grid_print_section => section_vals_get_subs_vals(force_env_section, "PRINT%GRID_INFORMATION")
-            CALL Setup_Ewald_Spline(pw_grid=cp_ddapc_ewald%pw_grid_qm, pw_pool=cp_ddapc_ewald%pw_pool_qm, &
-                                    coeff=cp_ddapc_ewald%coeff_qm, LG=LG, gx=gx, gy=gy, gz=gz, hmat=hmat, npts=npts, &
+            CALL Setup_Ewald_Spline(coeff=cp_ddapc_ewald%coeff_qm, LG=LG, gx=gx, gy=gy, gz=gz, hmat=hmat, npts=npts, &
                                     param_section=multipole_section, tag="ddapc", &
                                     print_section=grid_print_section)
             DEALLOCATE (LG)
@@ -318,8 +303,7 @@ CONTAINS
                hmat = mm_cell%hmat
                CALL eval_lg(multipole_section, hmat, mm_cell%deth, LG, gx, gy, gz)
                grid_print_section => section_vals_get_subs_vals(force_env_section, "PRINT%GRID_INFORMATION")
-               CALL Setup_Ewald_Spline(pw_grid=cp_ddapc_ewald%pw_grid_mm, pw_pool=cp_ddapc_ewald%pw_pool_mm, &
-                                       coeff=cp_ddapc_ewald%coeff_mm, LG=LG, gx=gx, gy=gy, gz=gz, hmat=hmat, npts=npts, &
+               CALL Setup_Ewald_Spline(coeff=cp_ddapc_ewald%coeff_mm, LG=LG, gx=gx, gy=gy, gz=gz, hmat=hmat, npts=npts, &
                                        param_section=multipole_section, tag="ddapc", &
                                        print_section=grid_print_section)
                DEALLOCATE (LG)
@@ -407,28 +391,12 @@ CONTAINS
 
       IF (ASSOCIATED(cp_ddapc_ewald)) THEN
          IF (ASSOCIATED(cp_ddapc_ewald%coeff_qm)) THEN
-            CALL cp_ddapc_ewald%pw_pool_qm%give_back_pw(cp_ddapc_ewald%coeff_qm)
+            CALL cp_ddapc_ewald%coeff_qm%release()
             DEALLOCATE (cp_ddapc_ewald%coeff_qm)
          END IF
          IF (ASSOCIATED(cp_ddapc_ewald%coeff_mm)) THEN
-            CALL cp_ddapc_ewald%pw_pool_mm%give_back_pw(cp_ddapc_ewald%coeff_mm)
+            CALL cp_ddapc_ewald%coeff_mm%release()
             DEALLOCATE (cp_ddapc_ewald%coeff_mm)
-         END IF
-         IF (ASSOCIATED(cp_ddapc_ewald%pw_pool_qm)) THEN
-            CALL pw_pool_release(cp_ddapc_ewald%pw_pool_qm)
-            CPASSERT(.NOT. ASSOCIATED(cp_ddapc_ewald%pw_pool_qm))
-         END IF
-         IF (ASSOCIATED(cp_ddapc_ewald%pw_pool_mm)) THEN
-            CALL pw_pool_release(cp_ddapc_ewald%pw_pool_mm)
-            CPASSERT(.NOT. ASSOCIATED(cp_ddapc_ewald%pw_pool_mm))
-         END IF
-         IF (ASSOCIATED(cp_ddapc_ewald%pw_grid_qm)) THEN
-            CALL pw_grid_release(cp_ddapc_ewald%pw_grid_qm)
-            CPASSERT(.NOT. ASSOCIATED(cp_ddapc_ewald%pw_grid_qm))
-         END IF
-         IF (ASSOCIATED(cp_ddapc_ewald%pw_grid_mm)) THEN
-            CALL pw_grid_release(cp_ddapc_ewald%pw_grid_mm)
-            CPASSERT(.NOT. ASSOCIATED(cp_ddapc_ewald%pw_grid_mm))
          END IF
          DEALLOCATE (cp_ddapc_ewald)
       END IF

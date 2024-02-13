@@ -26,11 +26,7 @@ MODULE qmmm_types_low
    USE particle_types,                  ONLY: allocate_particle_set,&
                                               deallocate_particle_set,&
                                               particle_type
-   USE pw_grid_types,                   ONLY: pw_grid_type
-   USE pw_grids,                        ONLY: pw_grid_release
    USE pw_pool_types,                   ONLY: pw_pool_p_type,&
-                                              pw_pool_release,&
-                                              pw_pool_type,&
                                               pw_pools_dealloc
    USE pw_types,                        ONLY: pw_r3d_rs_type
    USE qmmm_gaussian_types,             ONLY: qmmm_gaussian_p_type
@@ -92,8 +88,6 @@ MODULE qmmm_types_low
       REAL(KIND=dp)  :: Gmax, Fac(3)
       INTEGER        :: Kmax(3), n_rep_real(3)
       INTEGER, DIMENSION(:), POINTER :: mm_atom_index
-      TYPE(pw_pool_type), POINTER :: pw_pool
-      TYPE(pw_grid_type), POINTER :: pw_grid
       TYPE(pw_r3d_rs_type), POINTER :: TabLR
    END TYPE qmmm_per_pot_type
 
@@ -539,16 +533,8 @@ CONTAINS
                DEALLOCATE (Per_Potentials(I)%Pot%mm_atom_index)
             END IF
             IF (ASSOCIATED(Per_Potentials(I)%Pot%TabLR)) THEN
-               CALL Per_Potentials(I)%Pot%pw_pool%give_back_pw(Per_Potentials(I)%Pot%TabLR)
+               CALL Per_Potentials(I)%Pot%TabLR%release()
                DEALLOCATE (Per_Potentials(I)%Pot%TabLR)
-            END IF
-            IF (ASSOCIATED(Per_Potentials(I)%Pot%pw_pool)) THEN
-               CALL pw_pool_release(Per_Potentials(I)%Pot%pw_pool)
-               CPASSERT(.NOT. ASSOCIATED(Per_Potentials(I)%Pot%pw_pool))
-            END IF
-            IF (ASSOCIATED(Per_Potentials(I)%Pot%pw_grid)) THEN
-               CALL pw_grid_release(Per_Potentials(I)%Pot%pw_grid)
-               CPASSERT(.NOT. ASSOCIATED(Per_Potentials(I)%Pot%pw_grid))
             END IF
             DEALLOCATE (Per_Potentials(I)%Pot)
          END IF

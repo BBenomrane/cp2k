@@ -299,15 +299,13 @@ CONTAINS
       !
       ! Setting Up Fit Procedure
       !
-      NULLIFY (Pot%pw_grid)
-      NULLIFY (Pot%pw_pool)
       NULLIFY (Pot%TabLR, ngrids)
       CALL section_vals_val_get(qmmm_per_section, "ngrids", i_vals=ngrids)
       npts = ngrids
       hmat = mm_cell%hmat
 
       grid_print_section => section_vals_get_subs_vals(print_section, "GRID_INFORMATION")
-      CALL Setup_Ewald_Spline(pw_grid=Pot%pw_grid, pw_pool=Pot%pw_pool, coeff=Pot%TabLR, &
+      CALL Setup_Ewald_Spline(coeff=Pot%TabLR, &
                               LG=LG, gx=gx, gy=gy, gz=gz, hmat=hmat, npts=npts, param_section=qmmm_per_section, &
                               tag="qmmm", print_section=grid_print_section)
 
