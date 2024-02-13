@@ -73,7 +73,6 @@ MODULE fft_tools
       INTEGER                              :: nmray = 0, nyzray = 0
       TYPE(mp_comm_type)                   :: gs_group = mp_comm_type()
       TYPE(mp_cart_type)                   :: rs_group = mp_cart_type()
-      INTEGER                              :: numtask = 0
    END TYPE fft_scratch_sizes
 
    TYPE fft_scratch_type
@@ -523,8 +522,7 @@ CONTAINS
       COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
          POINTER                                         :: tbuf
       INTEGER :: g_pos, handle, max_dims(3), mcx2, mcz1, mcz2, mx1, mx2, my1, mz2, n1, n2, &
-         numtask, numtask_g, numtask_r, output_unit, r_dim(2), rp, shape_g(2), shape_r(3), sign, &
-         stat
+         numtask_g, numtask_r, output_unit, r_dim(2), rp, shape_g(2), shape_r(3), sign, stat
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
       LOGICAL                                            :: test
       REAL(KIND=dp)                                      :: norm, sum_data
@@ -547,7 +545,6 @@ CONTAINS
       IF (numtask_g /= numtask_r) THEN
          CPABORT("Real space and G space groups are different.")
       END IF
-      numtask = numtask_r
 
       IF (PRESENT(scale)) THEN
          norm = scale
@@ -563,7 +560,7 @@ CONTAINS
       max_dims(2) = MAX(1, shape_g(2))
       max_dims(1) = MAX(shape_g(1), PRODUCT(shape_r)/max_dims(2) + 1)
 
-      ALLOCATE (p2p(0:numtask - 1))
+      ALLOCATE (p2p(0:numtask_r - 1))
 
       CALL gs_group%rank_compare(rs_group, p2p)
 
@@ -575,7 +572,7 @@ CONTAINS
 
       n1 = MAXVAL(bo(2, 1, :, 1) - bo(1, 1, :, 1) + 1)
       n2 = MAXVAL(bo(2, 2, :, 1) - bo(1, 2, :, 1) + 1)
-      max_dims(3) = MAX(MAX((2*n2)/numtask, 2)*mx2*mz2, n1*MAXVAL(nyzray))
+      max_dims(3) = MAX(MAX((2*n2)/numtask_r, 2)*mx2*mz2, n1*MAXVAL(nyzray))
       n1 = MAXVAL(bo(2, 1, :, 2))
       n2 = MAXVAL(bo(2, 3, :, 2))
 
@@ -598,7 +595,6 @@ CONTAINS
       fft_scratch_size%nyzray = nyzray(g_pos)
       fft_scratch_size%gs_group = gs_group
       fft_scratch_size%rs_group = rs_group
-      fft_scratch_size%numtask = numtask
 
       IF (test) THEN
          IF (g_pos == 0 .AND. output_unit > 0) THEN
@@ -1042,7 +1038,6 @@ CONTAINS
       fft_scratch_size%mcy3 = mcy3
       fft_scratch_size%gs_group = group
       fft_scratch_size%rs_group = group
-      fft_scratch_size%numtask = DIM(1)*DIM(2)
 
       IF (DIM(1) > 1 .AND. DIM(2) > 1) THEN
 
@@ -2401,7 +2396,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      np = fft_scratch%sizes%numtask
+      np = fft_scratch%sizes%rs_group%num_pe
       mip = fft_scratch%mip
       scount => fft_scratch%scount
       rcount => fft_scratch%rcount
@@ -2495,7 +2490,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      np = fft_scratch%sizes%numtask
+      np = fft_scratch%sizes%rs_group%num_pe
       mip = fft_scratch%mip
       scount => fft_scratch%scount
       rcount => fft_scratch%rcount
@@ -2929,7 +2924,7 @@ CONTAINS
 
             IF (tf_type .NE. 400) THEN
                fft_scratch_new%fft_scratch%sizes = fft_sizes
-               np = fft_sizes%numtask
+               np = fft_sizes%rs_group%num_pe
                ALLOCATE (fft_scratch_new%fft_scratch%scount(0:np - 1), fft_scratch_new%fft_scratch%rcount(0:np - 1), &
                          fft_scratch_new%fft_scratch%sdispl(0:np - 1), fft_scratch_new%fft_scratch%rdispl(0:np - 1), &
                          fft_scratch_new%fft_scratch%pgcube(0:np - 1, 2))
@@ -3044,7 +3039,7 @@ CONTAINS
                mx2 = fft_sizes%mx2
                max_dims = fft_sizes%max_dims
                shape_g = fft_sizes%shape_g
-               np = fft_sizes%numtask
+               np = fft_sizes%rs_group%num_pe
                nmray = fft_sizes%nmray
                nyzray = fft_sizes%nyzray
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
@@ -3359,7 +3354,7 @@ CONTAINS
       equal = equal .AND. ALL(fft_size_1%rs_group%mepos_cart == fft_size_2%rs_group%mepos_cart)
       equal = equal .AND. ALL(fft_size_1%rs_group%num_pe_cart == fft_size_2%rs_group%num_pe_cart)
 
-      equal = equal .AND. fft_size_1%numtask == fft_size_2%numtask
+      equal = equal .AND. fft_size_1%rs_group%num_pe == fft_size_2%rs_group%num_pe
 
    END SUBROUTINE is_equal
 

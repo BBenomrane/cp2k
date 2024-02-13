@@ -226,7 +226,7 @@ CONTAINS
       COMPLEX(KIND=dp), DIMENSION(:, :), POINTER         :: grays, pbuf, qbuf, rbuf, sbuf
       COMPLEX(KIND=dp), DIMENSION(:, :, :), POINTER      :: tbuf
       INTEGER                                            :: g_pos, handle, mx2, mz2, n1, n2, ngpts, &
-                                                            numtask, numtask_g, numtask_r, rp
+                                                            numtask_g, numtask_r, rp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
       INTEGER, DIMENSION(2)                              :: r_dim, shape_g
       INTEGER, DIMENSION(3)                              :: max_dims
@@ -259,13 +259,12 @@ CONTAINS
          IF (numtask_g /= numtask_r) THEN
             CPABORT("Real space and G space groups are different.")
          END IF
-         numtask = numtask_r
 
          shape_g = SHAPE(grays)
          max_dims(2) = MAX(shape_g(2), 1)
          max_dims(1) = MAX(shape_g(1), (ngpts/max_dims(2) + 1))
 
-         ALLOCATE (p2p(0:numtask - 1))
+         ALLOCATE (p2p(0:numtask_r - 1))
 
          CALL gs_group%rank_compare(rs_group, p2p)
 
@@ -274,7 +273,7 @@ CONTAINS
          mz2 = bo(2, 3, rp, 2) - bo(1, 3, rp, 2) + 1
          n1 = MAXVAL(bo(2, 1, :, 1) - bo(1, 1, :, 1) + 1)
          n2 = MAXVAL(bo(2, 2, :, 1) - bo(1, 2, :, 1) + 1)
-         max_dims(3) = MAX(MAX((2*n2)/numtask, 2)*mx2*mz2, n1*MAXVAL(nyzray))
+         max_dims(3) = MAX(MAX((2*n2)/numtask_r, 2)*mx2*mz2, n1*MAXVAL(nyzray))
 
          fft_scratch_size%shape_r = nloc
          fft_scratch_size%max_dims = max_dims
@@ -292,7 +291,6 @@ CONTAINS
          fft_scratch_size%nyzray = nyzray(g_pos)
          fft_scratch_size%gs_group = gs_group
          fft_scratch_size%rs_group = rs_group
-         fft_scratch_size%numtask = numtask
 
          IF (r_dim(2) > 1) THEN
             !
@@ -387,7 +385,7 @@ CONTAINS
       COMPLEX(KIND=dp), DIMENSION(:, :), POINTER         :: grays, pbuf, qbuf, rbuf, sbuf
       COMPLEX(KIND=dp), DIMENSION(:, :, :), POINTER      :: tbuf
       INTEGER                                            :: g_pos, handle, mx2, mz2, n1, n2, ngpts, &
-                                                            numtask, numtask_g, numtask_r, rp
+                                                            numtask_g, numtask_r, rp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
       INTEGER, DIMENSION(2)                              :: r_dim, shape_g
       INTEGER, DIMENSION(3)                              :: max_dims
@@ -420,13 +418,12 @@ CONTAINS
          IF (numtask_g /= numtask_r) THEN
             CPABORT("Real space and G space groups are different.")
          END IF
-         numtask = numtask_r
 
          shape_g = SHAPE(grays)
          max_dims(2) = MAX(shape_g(2), 1)
          max_dims(1) = MAX(shape_g(1), (ngpts/max_dims(2) + 1))
 
-         ALLOCATE (p2p(0:numtask - 1))
+         ALLOCATE (p2p(0:numtask_r - 1))
 
          CALL gs_group%rank_compare(rs_group, p2p)
 
@@ -435,7 +432,7 @@ CONTAINS
          mz2 = bo(2, 3, rp, 2) - bo(1, 3, rp, 2) + 1
          n1 = MAXVAL(bo(2, 1, :, 1) - bo(1, 1, :, 1) + 1)
          n2 = MAXVAL(bo(2, 2, :, 1) - bo(1, 2, :, 1) + 1)
-         max_dims(3) = MAX(MAX((2*n2)/numtask, 2)*mx2*mz2, n1*MAXVAL(nyzray))
+         max_dims(3) = MAX(MAX((2*n2)/numtask_r, 2)*mx2*mz2, n1*MAXVAL(nyzray))
 
          fft_scratch_size%shape_r = nloc
          fft_scratch_size%max_dims = max_dims
@@ -453,7 +450,6 @@ CONTAINS
          fft_scratch_size%nyzray = nyzray(g_pos)
          fft_scratch_size%gs_group = gs_group
          fft_scratch_size%rs_group = rs_group
-         fft_scratch_size%numtask = numtask
 
          IF (r_dim(2) > 1) THEN
             !
