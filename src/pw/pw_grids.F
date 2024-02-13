@@ -84,36 +84,19 @@ CONTAINS
 !> \brief Initialize a PW grid with all defaults
 !> \param pw_grid ...
 !> \param pe_group ...
-!> \param local ...
 !> \par History
 !>      JGH (21-Feb-2003) : initialize pw_grid%reference
 !> \author JGH (7-Feb-2001) & fawzi
 ! **************************************************************************************************
-   SUBROUTINE pw_grid_create(pw_grid, pe_group, local)
+   SUBROUTINE pw_grid_create(pw_grid, pe_group)
 
       TYPE(pw_grid_type), POINTER                        :: pw_grid
 
       CLASS(mp_comm_type), INTENT(in)                     :: pe_group
-      LOGICAL, INTENT(IN), OPTIONAL                      :: local
 
-      LOGICAL                                            :: my_local
-
-      my_local = .FALSE.
-      IF (PRESENT(local)) my_local = local
       CPASSERT(.NOT. ASSOCIATED(pw_grid))
       ALLOCATE (pw_grid)
-      pw_grid%bounds = 0
-      pw_grid%cutoff = 0.0_dp
-      pw_grid%grid_span = FULLSPACE
-      pw_grid%para%mode = PW_MODE_LOCAL
-      pw_grid%para%rs_dims = 0
-      pw_grid%reference = 0
       pw_grid%ref_count = 1
-      NULLIFY (pw_grid%g)
-      NULLIFY (pw_grid%gsq)
-      NULLIFY (pw_grid%g_hatmap)
-      NULLIFY (pw_grid%gidx)
-      NULLIFY (pw_grid%grays)
 
       ! assign a unique tag to this grid
       grid_tag = grid_tag + 1
@@ -124,9 +107,8 @@ CONTAINS
       pw_grid%para%group_size = pw_grid%para%group%num_pe
       pw_grid%para%my_pos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
-      pw_grid%para%group_head = &
-         (pw_grid%para%group_head_id == pw_grid%para%my_pos)
-      IF (pw_grid%para%group_size > 1 .AND. (.NOT. my_local)) THEN
+      pw_grid%para%group_head = (pw_grid%para%group_head_id == pw_grid%para%my_pos)
+      IF (pw_grid%para%group_size > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
          pw_grid%para%mode = PW_MODE_LOCAL
@@ -866,9 +848,8 @@ CONTAINS
                END IF
                ! but should avoid having the first index 1 in all cases
                IF (pw_grid%para%rs_dims(1) == 1) THEN
-                  itmp = pw_grid%para%rs_dims(1)
                   pw_grid%para%rs_dims(1) = pw_grid%para%rs_dims(2)
-                  pw_grid%para%rs_dims(2) = itmp
+                  pw_grid%para%rs_dims(2) = 1
                END IF
             ELSE
                pw_grid%para%rs_dims = (/np, 1/)
