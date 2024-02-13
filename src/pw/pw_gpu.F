@@ -228,7 +228,7 @@ CONTAINS
       INTEGER                                            :: g_pos, handle, mx2, mz2, n1, n2, ngpts, &
                                                             numtask, numtask_g, numtask_r, rp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
-      INTEGER, DIMENSION(2)                              :: r_dim, r_pos, shape_g
+      INTEGER, DIMENSION(2)                              :: r_dim, shape_g
       INTEGER, DIMENSION(3)                              :: max_dims
       INTEGER, DIMENSION(:), POINTER                     :: n, nloc, nyzray
       INTEGER, DIMENSION(:, :, :, :), POINTER            :: bo
@@ -256,7 +256,6 @@ CONTAINS
          g_pos = gs_group%mepos
          numtask_r = rs_group%num_pe
          r_dim = rs_group%num_pe_cart
-         r_pos = rs_group%mepos_cart
          IF (numtask_g /= numtask_r) THEN
             CPABORT("Real space and G space groups are different.")
          END IF
@@ -293,9 +292,6 @@ CONTAINS
          fft_scratch_size%nyzray = nyzray(g_pos)
          fft_scratch_size%gs_group = gs_group
          fft_scratch_size%rs_group = rs_group
-         fft_scratch_size%g_pos = g_pos
-         fft_scratch_size%r_pos = r_pos
-         fft_scratch_size%r_dim = r_dim
          fft_scratch_size%numtask = numtask
 
          IF (r_dim(2) > 1) THEN
@@ -393,7 +389,7 @@ CONTAINS
       INTEGER                                            :: g_pos, handle, mx2, mz2, n1, n2, ngpts, &
                                                             numtask, numtask_g, numtask_r, rp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
-      INTEGER, DIMENSION(2)                              :: r_dim, r_pos, shape_g
+      INTEGER, DIMENSION(2)                              :: r_dim, shape_g
       INTEGER, DIMENSION(3)                              :: max_dims
       INTEGER, DIMENSION(:), POINTER                     :: n, nloc, nyzray
       INTEGER, DIMENSION(:, :, :, :), POINTER            :: bo
@@ -421,7 +417,6 @@ CONTAINS
          g_pos = gs_group%mepos
          numtask_r = rs_group%num_pe
          r_dim = rs_group%num_pe_cart
-         r_pos = rs_group%mepos_cart
          IF (numtask_g /= numtask_r) THEN
             CPABORT("Real space and G space groups are different.")
          END IF
@@ -458,9 +453,6 @@ CONTAINS
          fft_scratch_size%nyzray = nyzray(g_pos)
          fft_scratch_size%gs_group = gs_group
          fft_scratch_size%rs_group = rs_group
-         fft_scratch_size%g_pos = g_pos
-         fft_scratch_size%r_pos = r_pos
-         fft_scratch_size%r_dim = r_dim
          fft_scratch_size%numtask = numtask
 
          IF (r_dim(2) > 1) THEN

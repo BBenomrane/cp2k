@@ -73,7 +73,6 @@ MODULE fft_tools
       INTEGER                              :: nmray = 0, nyzray = 0
       TYPE(mp_comm_type)                   :: gs_group = mp_comm_type()
       TYPE(mp_cart_type)                   :: rs_group = mp_cart_type()
-      INTEGER, DIMENSION(2)                :: g_pos = 0, r_pos = 0, r_dim = 0
       INTEGER                              :: numtask = 0
    END TYPE fft_scratch_sizes
 
@@ -524,8 +523,8 @@ CONTAINS
       COMPLEX(KIND=dp), CONTIGUOUS, DIMENSION(:, :, :), &
          POINTER                                         :: tbuf
       INTEGER :: g_pos, handle, max_dims(3), mcx2, mcz1, mcz2, mx1, mx2, my1, mz2, n1, n2, &
-         numtask, numtask_g, numtask_r, output_unit, r_dim(2), r_pos(2), rp, shape_g(2), &
-         shape_r(3), sign, stat
+         numtask, numtask_g, numtask_r, output_unit, r_dim(2), rp, shape_g(2), shape_r(3), sign, &
+         stat
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: p2p
       LOGICAL                                            :: test
       REAL(KIND=dp)                                      :: norm, sum_data
@@ -545,7 +544,6 @@ CONTAINS
       g_pos = gs_group%mepos
       numtask_r = rs_group%num_pe
       r_dim = rs_group%num_pe_cart
-      r_pos = rs_group%mepos_cart
       IF (numtask_g /= numtask_r) THEN
          CPABORT("Real space and G space groups are different.")
       END IF
@@ -600,9 +598,6 @@ CONTAINS
       fft_scratch_size%nyzray = nyzray(g_pos)
       fft_scratch_size%gs_group = gs_group
       fft_scratch_size%rs_group = rs_group
-      fft_scratch_size%g_pos = g_pos
-      fft_scratch_size%r_pos = r_pos
-      fft_scratch_size%r_dim = r_dim
       fft_scratch_size%numtask = numtask
 
       IF (test) THEN
@@ -1047,7 +1042,6 @@ CONTAINS
       fft_scratch_size%mcy3 = mcy3
       fft_scratch_size%gs_group = group
       fft_scratch_size%rs_group = group
-      fft_scratch_size%g_pos = my_pos
       fft_scratch_size%numtask = DIM(1)*DIM(2)
 
       IF (DIM(1) > 1 .AND. DIM(2) > 1) THEN
@@ -1618,7 +1612,7 @@ CONTAINS
       COMPLEX(KIND=dp), DIMENSION(:), POINTER, CONTIGUOUS            :: xzbuf, yzbuf
       COMPLEX(KIND=sp), DIMENSION(:), POINTER, CONTIGUOUS            :: xzbuf_sgl, yzbuf_sgl
       INTEGER                                            :: handle, icrs, ip, ipl, ipr, ir, ix, iz, &
-                                                            jj, jx, jy, jz, myx, myz, np, npx, &
+                                                            r_pos(2), jj, jx, jy, jz, np, npx, &
                                                             npz, nx, nz, rs_pos
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS                     :: pzcoord, rcount, rdispl, scount, sdispl, &
                                                                         xcor, zcor
@@ -1753,14 +1747,13 @@ CONTAINS
          END IF
       END IF
 
-      myx = fft_scratch%sizes%r_pos(1)
-      myz = fft_scratch%sizes%r_pos(2)
+      r_pos = fft_scratch%sizes%rs_group%mepos_cart
       nz = bo(2, 3, rs_pos) - bo(1, 3, rs_pos) + 1
 
 !$OMP PARALLEL DO DEFAULT(NONE), &
 !$OMP             PRIVATE(ipr,jj,ir,jx,jy,jz),&
 !$OMP             SHARED(tb,np,p2p,bo,rs_pos,nray),&
-!$OMP             SHARED(yzp,alltoall_sgl,zcor,myz),&
+!$OMP             SHARED(yzp,alltoall_sgl,zcor,r_pos),&
 !$OMP             SHARED(xzbuf,xzbuf_sgl,nz,rdispl)
       DO ip = 0, np - 1
          ipr = p2p(ip)
@@ -1769,14 +1762,14 @@ CONTAINS
             DO ir = 1, nray(ip)
                jz = yzp(2, ir, ip)
                IF (alltoall_sgl) THEN
-                  IF (zcor(jz) == myz) THEN
+                  IF (zcor(jz) == r_pos(2)) THEN
                      jj = jj + 1
                      jy = yzp(1, ir, ip)
                      jz = jz - bo(1, 3, rs_pos) + 1
                      tb(jy, jz + jx*nz) = xzbuf_sgl(jj + rdispl(ipr))
                   END IF
                ELSE
-                  IF (zcor(jz) == myz) THEN
+                  IF (zcor(jz) == r_pos(2)) THEN
                      jj = jj + 1
                      jy = yzp(1, ir, ip)
                      jz = jz - bo(1, 3, rs_pos) + 1
@@ -1828,7 +1821,7 @@ CONTAINS
       COMPLEX(KIND=dp), DIMENSION(:), POINTER, CONTIGUOUS            :: xzbuf, yzbuf
       COMPLEX(KIND=sp), DIMENSION(:), POINTER, CONTIGUOUS            :: xzbuf_sgl, yzbuf_sgl
       INTEGER                                            :: handle, icrs, ip, ipl, ir, ix, ixx, iz, &
-                                                            jj, jx, jy, jz, mp, myx, myz, np, npx, &
+                                                            r_pos(2), jj, jx, jy, jz, mp, np, npx, &
                                                             npz, nx, nz
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS                     :: pzcoord, rcount, rdispl, scount, sdispl, &
                                                                         xcor, zcor
@@ -1912,15 +1905,14 @@ CONTAINS
       END IF
 
 ! Now do the actual packing
-      myx = fft_scratch%sizes%r_pos(1)
-      myz = fft_scratch%sizes%r_pos(2)
+      r_pos = fft_scratch%sizes%rs_group%mepos_cart
       mp = p2p(my_pos)
       nz = bo(2, 3, mp) - bo(1, 3, mp) + 1
       nx = bo(2, 1, mp) - bo(1, 1, mp) + 1
 
 !$OMP PARALLEL DO DEFAULT(NONE), &
 !$OMP             PRIVATE(jj,ipl,ir,jx,jy,jz,ixx),&
-!$OMP             SHARED(np,p2p,nray,yzp,zcor,myz,bo,mp),&
+!$OMP             SHARED(np,p2p,nray,yzp,zcor,r_pos,bo,mp),&
 !$OMP             SHARED(alltoall_sgl,nx,scount,sdispl),&
 !$OMP             SHARED(xzbuf,xzbuf_sgl,sb,nz)
       DO ip = 0, np - 1
@@ -1928,7 +1920,7 @@ CONTAINS
          ipl = p2p(ip)
          DO ir = 1, nray(ip)
             jz = yzp(2, ir, ip)
-            IF (zcor(jz) == myz) THEN
+            IF (zcor(jz) == r_pos(2)) THEN
                jj = jj + 1
                jy = yzp(1, ir, ip)
                jz = yzp(2, ir, ip) - bo(1, 3, mp) + 1
@@ -2870,8 +2862,8 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'get_fft_scratch'
 
-      INTEGER :: coord(2), DIM(2), handle, i, ix, iz, m1, m2, &
-                 mcx2, mcy3, mcz1, mcz2, mx1, mx2, my1, my3, mz1, mz2, mz3, &
+      INTEGER :: coord(2), DIM(2), handle, i, ix, iz, &
+                 r_dim(2), mcx2, mcy3, mcz1, mcz2, mx1, mx2, my1, my3, mz1, mz2, mz3, &
                  shape_r(3), nbx, nbz, nm, nmray, np, nyzray, pos(2), shape_g(2), max_dims(3)
       INTEGER, DIMENSION(3)                    :: pcoord
       LOGICAL                                  :: equal
@@ -3101,8 +3093,7 @@ CONTAINS
                mcx2 = fft_sizes%mcx2
                shape_g = fft_sizes%shape_g
                nyzray = fft_sizes%nyzray
-               m1 = fft_sizes%r_dim(1)
-               m2 = fft_sizes%r_dim(2)
+               r_dim = fft_sizes%rs_group%num_pe_cart
                nbx = fft_sizes%nbx
                nbz = fft_sizes%nbz
                CALL fft_alloc(fft_scratch_new%fft_scratch%p1buf, [mx1*my1, n(3)])
@@ -3142,7 +3133,7 @@ CONTAINS
                   CALL fft_alloc(fft_scratch_new%fft_scratch%yzbuf, shape_g)
                   CALL fft_alloc(fft_scratch_new%fft_scratch%xzbuf, [n(2)*mx2*mz2])
                END IF
-               ALLOCATE (fft_scratch_new%fft_scratch%pgrid(0:m1 - 1, 0:m2 - 1))
+               ALLOCATE (fft_scratch_new%fft_scratch%pgrid(0:r_dim(1) - 1, 0:r_dim(2) - 1))
                ALLOCATE (fft_scratch_new%fft_scratch%xcor(nbx))
                ALLOCATE (fft_scratch_new%fft_scratch%zcor(nbz))
                ALLOCATE (fft_scratch_new%fft_scratch%pzcoord(0:np - 1))
@@ -3174,8 +3165,8 @@ CONTAINS
                END DO
 
                !initialise pgrid
-               DO ix = 0, m1 - 1
-                  DO iz = 0, m2 - 1
+               DO ix = 0, r_dim(1) - 1
+                  DO iz = 0, r_dim(2) - 1
                      coord = (/ix, iz/)
                      CALL fft_sizes%rs_group%rank_cart(coord, fft_scratch_new%fft_scratch%pgrid(ix, iz))
                   END DO
@@ -3364,9 +3355,9 @@ CONTAINS
       equal = equal .AND. fft_size_1%gs_group == fft_size_2%gs_group
       equal = equal .AND. fft_size_1%rs_group == fft_size_2%rs_group
 
-      equal = equal .AND. ALL(fft_size_1%g_pos == fft_size_2%g_pos)
-      equal = equal .AND. ALL(fft_size_1%r_pos == fft_size_2%r_pos)
-      equal = equal .AND. ALL(fft_size_1%r_dim == fft_size_2%r_dim)
+      equal = equal .AND. fft_size_1%gs_group%mepos == fft_size_2%gs_group%mepos
+      equal = equal .AND. ALL(fft_size_1%rs_group%mepos_cart == fft_size_2%rs_group%mepos_cart)
+      equal = equal .AND. ALL(fft_size_1%rs_group%num_pe_cart == fft_size_2%rs_group%num_pe_cart)
 
       equal = equal .AND. fft_size_1%numtask == fft_size_2%numtask
 
