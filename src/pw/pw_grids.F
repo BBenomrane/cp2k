@@ -106,8 +106,6 @@ CONTAINS
       CALL pw_grid%para%group%from_dup(pe_group)
       pw_grid%para%group_size = pw_grid%para%group%num_pe
       pw_grid%para%my_pos = pw_grid%para%group%mepos
-      pw_grid%para%group_head_id = 0
-      pw_grid%para%group_head = (pw_grid%para%group_head_id == pw_grid%para%my_pos)
       IF (pw_grid%para%group_size > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -669,7 +667,7 @@ CONTAINS
          n(3) = MINVAL(pw_grid%para%nyzray)
          rv(:, 3) = REAL(n, KIND=dp)
 
-         IF (pw_grid%para%group_head .AND. info > 0) THEN
+         IF (info > 0) THEN
             WRITE (info, '(/,A,T71,I10)') &
                " PW_GRID| Information for grid number ", pw_grid%id_nr
             IF (pw_grid%reference > 0) THEN

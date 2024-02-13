@@ -44,8 +44,6 @@ MODULE pw_grid_types
       TYPE(mp_comm_type) :: group = mp_comm_null ! MPI group
       INTEGER :: my_pos = -1! Position within group
       INTEGER :: group_size = -1! # of Processors in group
-      LOGICAL :: group_head = .FALSE. ! Master process within group
-      INTEGER :: group_head_id = 0 ! Id of group_head
       INTEGER, DIMENSION(:, :, :), ALLOCATABLE :: yzp ! g-space rays (xy,k,pe)
       INTEGER, DIMENSION(:, :), ALLOCATABLE :: yzq ! local inverse pointer of yzp
       INTEGER, DIMENSION(:), ALLOCATABLE :: nyzray ! number of g-space rays (pe)
