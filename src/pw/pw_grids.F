@@ -84,22 +84,16 @@ CONTAINS
 !> \brief Initialize a PW grid with all defaults
 !> \param pw_grid ...
 !> \param pe_group ...
-!> \param local ...
 !> \par History
 !>      JGH (21-Feb-2003) : initialize pw_grid%reference
 !> \author JGH (7-Feb-2001) & fawzi
 ! **************************************************************************************************
-   SUBROUTINE pw_grid_create(pw_grid, pe_group, local)
+   SUBROUTINE pw_grid_create(pw_grid, pe_group)
 
       TYPE(pw_grid_type), POINTER                        :: pw_grid
 
       CLASS(mp_comm_type), INTENT(in)                     :: pe_group
-      LOGICAL, INTENT(IN), OPTIONAL                      :: local
 
-      LOGICAL                                            :: my_local
-
-      my_local = .FALSE.
-      IF (PRESENT(local)) my_local = local
       CPASSERT(.NOT. ASSOCIATED(pw_grid))
       ALLOCATE (pw_grid)
       pw_grid%bounds = 0
@@ -126,7 +120,7 @@ CONTAINS
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
          (pw_grid%para%group_head_id == pw_grid%para%my_pos)
-      IF (pw_grid%para%group_size > 1 .AND. (.NOT. my_local)) THEN
+      IF (pw_grid%para%group_size > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
          pw_grid%para%mode = PW_MODE_LOCAL
