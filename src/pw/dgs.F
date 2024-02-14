@@ -105,22 +105,23 @@ CONTAINS
       REAL(KIND=dp)                                      :: cutoff, ecut
       REAL(KIND=dp), DIMENSION(3, 3)                     :: s_cell_hmat, unit_cell_hmat
 
-      CALL dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, grid_s, grid_b, bounds_s, bounds_b, cutoff)
+      CALL dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, bounds_s, bounds_b, cutoff)
 
       ecut = 0.5_dp*cutoff*cutoff
       IF (PRESENT(grid_ref)) THEN
-         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bounds_b, cutoff=ecut, spherical=.TRUE., &
+         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bounds_b, grid_span=HALFSPACE, cutoff=ecut, spherical=.TRUE., &
                             ref_grid=grid_ref, rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
       ELSE
-         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bounds_b, cutoff=ecut, spherical=.TRUE., &
+         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bounds_b, grid_span=HALFSPACE, cutoff=ecut, spherical=.TRUE., &
                             rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
       END IF
 
       CALL dg_find_basis(grid_b%npts, b_cell_hmat, unit_cell_hmat)
 
-      CALL dg_set_cell(grid_s%npts, unit_cell_hmat, s_cell_hmat)
+      CALL dg_set_cell(bounds_s(2, :) - bounds_s(1, :) + 1, unit_cell_hmat, s_cell_hmat)
 
-      CALL pw_grid_setup(s_cell_hmat, grid_s, bounds=bounds_s, cutoff=ecut, iounit=iounit, fft_usage=fft_usage)
+      CALL pw_grid_setup(s_cell_hmat, grid_s, bounds=bounds_s, grid_span=HALFSPACE, &
+                         cutoff=ecut, iounit=iounit, fft_usage=fft_usage)
 
    END SUBROUTINE dg_pme_grid_setup
 
@@ -151,19 +152,16 @@ CONTAINS
 !> \param b_cell_hmat ...
 !> \param npts_s ...
 !> \param cutoff_radius ...
-!> \param grid_s ...
-!> \param grid_b ...
 !> \param bounds_s ...
 !> \param bounds_b ...
 !> \param cutoff ...
 ! **************************************************************************************************
-   SUBROUTINE dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, grid_s, &
-                             grid_b, bounds_s, bounds_b, cutoff)
+   SUBROUTINE dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, &
+                             bounds_s, bounds_b, cutoff)
 
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: b_cell_hmat
       INTEGER, DIMENSION(:), INTENT(IN)                  :: npts_s
       REAL(KIND=dp), INTENT(IN)                          :: cutoff_radius
-      TYPE(pw_grid_type), POINTER                        :: grid_s, grid_b
       INTEGER, DIMENSION(2, 3), INTENT(OUT)              :: bounds_s, bounds_b
       REAL(KIND=dp), INTENT(OUT)                         :: cutoff
 
@@ -208,13 +206,9 @@ CONTAINS
 ! big grid bounds
       bounds_b(1, :) = -npts_b/2
       bounds_b(2, :) = +(npts_b - 1)/2
-      grid_b%grid_span = HALFSPACE
-      grid_b%npts = npts_b
 ! small grid bounds
       bounds_s(1, :) = -nout(:)/2
       bounds_s(2, :) = (+nout(:) - 1)/2
-      grid_s%grid_span = HALFSPACE
-      grid_s%npts = nout
 
       cutoff = pw_find_cutoff(npts_b, b_cell_h_inv)
 
