@@ -101,28 +101,26 @@ CONTAINS
       INTEGER, INTENT(IN), OPTIONAL                      :: iounit
       LOGICAL, INTENT(IN), OPTIONAL                      :: fft_usage
 
-      INTEGER, DIMENSION(2, 3)                           :: bo
+      INTEGER, DIMENSION(2, 3)                           :: bounds_b, bounds_s
       REAL(KIND=dp)                                      :: cutoff, ecut
       REAL(KIND=dp), DIMENSION(3, 3)                     :: s_cell_hmat, unit_cell_hmat
 
-      CALL dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, grid_s, grid_b, cutoff)
+      CALL dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, bounds_s, bounds_b, cutoff)
 
       ecut = 0.5_dp*cutoff*cutoff
-      bo = grid_b%bounds
       IF (PRESENT(grid_ref)) THEN
-         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bo, cutoff=ecut, spherical=.TRUE., &
+         CALL pw_grid_setup(b_cell_hmat, grid_b, grid_span=HALFSPACE, bounds=bounds_b, cutoff=ecut, spherical=.TRUE., &
                             ref_grid=grid_ref, rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
       ELSE
-         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bo, cutoff=ecut, spherical=.TRUE., &
+         CALL pw_grid_setup(b_cell_hmat, grid_b, grid_span=HALFSPACE, bounds=bounds_b, cutoff=ecut, spherical=.TRUE., &
                             rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
       END IF
 
-      CALL dg_find_basis(grid_b%npts, b_cell_hmat, unit_cell_hmat)
+      CALL dg_find_basis(bounds_b(2, :) - bounds_b(1, :) + 1, b_cell_hmat, unit_cell_hmat)
 
-      CALL dg_set_cell(grid_s%npts, unit_cell_hmat, s_cell_hmat)
+      CALL dg_set_cell(bounds_s(2, :) - bounds_s(1, :) + 1, unit_cell_hmat, s_cell_hmat)
 
-      bo = grid_s%bounds
-      CALL pw_grid_setup(s_cell_hmat, grid_s, bounds=bo, cutoff=ecut, iounit=iounit, fft_usage=fft_usage)
+      CALL pw_grid_setup(s_cell_hmat, grid_s, grid_span=HALFSPACE, bounds=bounds_s, cutoff=ecut, iounit=iounit, fft_usage=fft_usage)
 
    END SUBROUTINE dg_pme_grid_setup
 
@@ -153,20 +151,20 @@ CONTAINS
 !> \param b_cell_hmat ...
 !> \param npts_s ...
 !> \param cutoff_radius ...
-!> \param grid_s ...
-!> \param grid_b ...
+!> \param bounds_s ...
+!> \param bounds_b ...
 !> \param cutoff ...
 ! **************************************************************************************************
-   SUBROUTINE dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, grid_s, &
-                             grid_b, cutoff)
+   SUBROUTINE dg_find_cutoff(b_cell_hmat, npts_s, cutoff_radius, bounds_s, &
+                             bounds_b, cutoff)
 
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: b_cell_hmat
       INTEGER, DIMENSION(:), INTENT(IN)                  :: npts_s
       REAL(KIND=dp), INTENT(IN)                          :: cutoff_radius
-      TYPE(pw_grid_type), POINTER                        :: grid_s, grid_b
+      INTEGER, DIMENSION(2, 3), INTENT(OUT)              :: bounds_s, bounds_b
       REAL(KIND=dp), INTENT(OUT)                         :: cutoff
 
-      INTEGER                                            :: nout(3)
+      INTEGER                                            :: nout(3), npts_b(3)
       REAL(KIND=dp)                                      :: b_cell_deth, cell_lengths(3), dr(3)
       REAL(KIND=dp), DIMENSION(3, 3)                     :: b_cell_h_inv
 
@@ -188,33 +186,30 @@ CONTAINS
       cell_lengths = get_cell_lengths(b_cell_hmat)
 
       CALL dg_get_spacing(nout, cutoff_radius, dr)
-      CALL dg_find_radix(dr, cell_lengths, grid_b%npts)
+      CALL dg_find_radix(dr, cell_lengths, npts_b)
 
-! In-line code to set grid_b % npts = npts_s if necessary
-      IF (nout(1) > grid_b%npts(1)) THEN
-         grid_b%npts(1) = nout(1)
+      ! Enforce that the big grid has at least as many points as the small grid
+      IF (nout(1) > npts_b(1)) THEN
+         npts_b(1) = nout(1)
          dr(1) = cell_lengths(1)/REAL(nout(1), KIND=dp)
       END IF
-      IF (nout(2) > grid_b%npts(2)) THEN
-         grid_b%npts(2) = nout(2)
+      IF (nout(2) > npts_b(2)) THEN
+         npts_b(2) = nout(2)
          dr(2) = cell_lengths(2)/REAL(nout(2), KIND=dp)
       END IF
-      IF (nout(3) > grid_b%npts(3)) THEN
-         grid_b%npts(3) = nout(3)
+      IF (nout(3) > npts_b(3)) THEN
+         npts_b(3) = nout(3)
          dr(3) = cell_lengths(3)/REAL(nout(3), KIND=dp)
       END IF
 
 ! big grid bounds
-      grid_b%bounds(1, :) = -grid_b%npts/2
-      grid_b%bounds(2, :) = +(grid_b%npts - 1)/2
-      grid_b%grid_span = HALFSPACE
+      bounds_b(1, :) = -npts_b/2
+      bounds_b(2, :) = +(npts_b - 1)/2
 ! small grid bounds
-      grid_s%bounds(1, :) = -nout(:)/2
-      grid_s%bounds(2, :) = (+nout(:) - 1)/2
-      grid_s%grid_span = HALFSPACE
-      grid_s%npts = nout
+      bounds_s(1, :) = -nout(:)/2
+      bounds_s(2, :) = (+nout(:) - 1)/2
 
-      cutoff = pw_find_cutoff(grid_b%npts, b_cell_h_inv)
+      cutoff = pw_find_cutoff(npts_b, b_cell_h_inv)
 
    END SUBROUTINE dg_find_cutoff
 
