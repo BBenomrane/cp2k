@@ -42,7 +42,6 @@ MODULE pw_grid_types
       LOGICAL :: ray_distribution = .FALSE. ! block or pencil distribution
       LOGICAL :: blocked = .FALSE. ! block or pencil distribution
       TYPE(mp_comm_type) :: group = mp_comm_null ! MPI group
-      INTEGER :: my_pos = -1! Position within group
       INTEGER :: group_size = -1! # of Processors in group
       LOGICAL :: group_head = .FALSE. ! Master process within group
       INTEGER :: group_head_id = 0 ! Id of group_head

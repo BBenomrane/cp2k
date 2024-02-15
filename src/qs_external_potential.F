@@ -412,7 +412,7 @@ CONTAINS
       ! The values of external potential on grid are distributed among the
       ! processes, so first we have to gather them up
       gid = grid%pw_grid%para%group
-      my_rank = grid%pw_grid%para%my_pos
+      my_rank = grid%pw_grid%para%rs_group%mepos
       num_pe = grid%pw_grid%para%group_size
       tag = 1
 

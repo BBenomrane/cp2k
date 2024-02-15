@@ -592,7 +592,7 @@ CONTAINS
 
       ALLOCATE (pab(maxco, 1))
       offset = 0
-      my_pos = mgrid_rspace(1)%pw_grid%para%my_pos
+      my_pos = mgrid_rspace(1)%pw_grid%para%rs_group%mepos
       group_size = mgrid_rspace(1)%pw_grid%para%group_size
 
       DO ikind = 1, SIZE(atomic_kind_set)
@@ -2500,7 +2500,7 @@ CONTAINS
 
       offset = 0
       group = mgrid_rspace(1)%pw_grid%para%group
-      my_pos = mgrid_rspace(1)%pw_grid%para%my_pos
+      my_pos = mgrid_rspace(1)%pw_grid%para%rs_group%mepos
       group_size = mgrid_rspace(1)%pw_grid%para%group_size
       ALLOCATE (where_is_the_point(0:group_size - 1))
 
@@ -2706,7 +2706,7 @@ CONTAINS
 
       offset = 0
       group = mgrid_rspace(1)%pw_grid%para%group
-      my_pos = mgrid_rspace(1)%pw_grid%para%my_pos
+      my_pos = mgrid_rspace(1)%pw_grid%para%rs_group%mepos
       group_size = mgrid_rspace(1)%pw_grid%para%group_size
       ALLOCATE (where_is_the_point(0:group_size - 1))
 

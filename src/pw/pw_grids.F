@@ -126,10 +126,10 @@ CONTAINS
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm_self)
       pw_grid%para%group_size = pw_grid%para%group%num_pe
-      pw_grid%para%my_pos = pw_grid%para%group%mepos
+      pw_grid%para%rs_group%mepos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
-         (pw_grid%para%group_head_id == pw_grid%para%my_pos)
+         (pw_grid%para%group_head_id == pw_grid%para%rs_group%mepos)
       IF (pw_grid%para%group_size > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -336,10 +336,10 @@ CONTAINS
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm)
       pw_grid%para%group_size = pw_grid%para%group%num_pe
-      pw_grid%para%my_pos = pw_grid%para%group%mepos
+      pw_grid%para%rs_group%mepos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
-         (pw_grid%para%group_head_id == pw_grid%para%my_pos)
+         (pw_grid%para%group_head_id == pw_grid%para%rs_group%mepos)
       IF (pw_grid%para%group_size > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -1035,7 +1035,7 @@ CONTAINS
                yz_mask(lo(1), lo(2)) = 0
                ip = MOD(i - 1, 2*np)
                IF (ip > np - 1) ip = 2*np - ip - 1
-               IF (ip == pw_grid%para%my_pos) THEN
+               IF (ip == pw_grid%para%rs_group%mepos) THEN
                   pw_grid%ngpts_cut_local = pw_grid%ngpts_cut_local + gmax
                END IF
                pw_grid%para%yzq(lo(1), lo(2)) = ip
@@ -1074,7 +1074,7 @@ CONTAINS
                      ns = pw_grid%para%nyzray(ip)
                      pw_grid%para%yzp(1, ns, ip) = j
                      pw_grid%para%yzp(2, ns, ip) = i
-                     IF (ip == pw_grid%para%my_pos) THEN
+                     IF (ip == pw_grid%para%rs_group%mepos) THEN
                         pw_grid%para%yzq(j, i) = ns
                      ELSE
                         pw_grid%para%yzq(j, i) = -1
@@ -1133,7 +1133,7 @@ CONTAINS
 
             ALLOCATE (pemap(0:np - 1))
             pemap = 0
-            pemap(pw_grid%para%my_pos) = pw_grid%para%rs_mpo
+            pemap(pw_grid%para%rs_group%mepos) = pw_grid%para%rs_mpo
             CALL pw_grid%para%group%sum(pemap)
 
             DO ip = 0, np - 1
@@ -1164,7 +1164,7 @@ CONTAINS
       IF (pw_grid%para%mode .EQ. PW_MODE_DISTRIBUTED) THEN
          ALLOCATE (pw_grid%para%pos_of_x(pw_grid%bounds(1, 1):pw_grid%bounds(2, 1)))
          pw_grid%para%pos_of_x = 0
-         pw_grid%para%pos_of_x(pw_grid%bounds_local(1, 1):pw_grid%bounds_local(2, 1)) = pw_grid%para%my_pos
+         pw_grid%para%pos_of_x(pw_grid%bounds_local(1, 1):pw_grid%bounds_local(2, 1)) = pw_grid%para%rs_group%mepos
          CALL pw_grid%para%group%sum(pw_grid%para%pos_of_x)
       ELSE
          ! this should not be needed
@@ -1235,7 +1235,7 @@ CONTAINS
                yz_mask(y, z) = 0
                pw_grid%para%yzq(y, z) = ip
             END IF
-            IF (ip == pw_grid%para%my_pos) THEN
+            IF (ip == pw_grid%para%rs_group%mepos) THEN
                pw_grid%ngpts_cut_local = pw_grid%ngpts_cut_local + gmax
             END IF
          END DO
@@ -1405,7 +1405,7 @@ CONTAINS
             nlim(2) = n_upperlimit
          ELSE IF (pw_grid%para%mode == PW_MODE_DISTRIBUTED) THEN
             n = n_upperlimit - bounds(1, 3) + 1
-            nlim = get_limit(n, pw_grid%para%group_size, pw_grid%para%my_pos)
+            nlim = get_limit(n, pw_grid%para%group_size, pw_grid%para%rs_group%mepos)
             nlim = nlim + bounds(1, 3) - 1
          ELSE
             CPABORT("para % mode not specified")
@@ -1512,7 +1512,7 @@ CONTAINS
          IF (pw_grid%para%ray_distribution) THEN
 
             gpt = 0
-            ip = pw_grid%para%my_pos
+            ip = pw_grid%para%rs_group%mepos
             DO i = 1, pw_grid%para%nyzray(ip)
                n = pw_grid%para%yzp(2, i, ip) + lbz - 1
                m = pw_grid%para%yzp(1, i, ip) + lby - 1
@@ -1731,7 +1731,7 @@ CONTAINS
 
       IF (pw_grid%para%mode == PW_MODE_DISTRIBUTED) THEN
          ALLOCATE (pw_grid%grays(pw_grid%npts(1), &
-                                 pw_grid%para%nyzray(pw_grid%para%my_pos)))
+                                 pw_grid%para%nyzray(pw_grid%para%rs_group%mepos)))
       END IF
 
       ALLOCATE (pw_grid%mapl%pos(bounds(1, 1):bounds(2, 1)))
@@ -2067,7 +2067,7 @@ CONTAINS
             END DO
          END IF
 
-         ip = pw_grid%para%my_pos
+         ip = pw_grid%para%rs_group%mepos
          is = 0
          DO i = 1, nz
             DO j = 1, ny

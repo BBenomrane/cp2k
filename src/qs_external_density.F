@@ -115,7 +115,7 @@ CONTAINS
          CALL section_vals_val_get(ext_den_section, "FILE_DENSITY", c_val=filename)
 
          tag = 1
-         ASSOCIATE (gid => rho_ext_r(1)%pw_grid%para%group, my_rank => rho_ext_r(1)%pw_grid%para%my_pos, &
+         ASSOCIATE (gid => rho_ext_r(1)%pw_grid%para%group, my_rank => rho_ext_r(1)%pw_grid%para%rs_group%mepos, &
                     num_pe => rho_ext_r(1)%pw_grid%para%group_size)
 
             IF (dft_control%read_external_density) THEN

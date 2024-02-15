@@ -1365,7 +1365,7 @@ CONTAINS
                                        WRITE (out_unit, '(A,T66,E15.6)') "  scale factor", norm
                                     END IF
 
-                                    my_pos = pw1%pw_grid%para%my_pos
+                                    my_pos = pw1%pw_grid%para%rs_group%mepos
                                     nrays = pw1%pw_grid%para%nyzray(my_pos)
                                     grays => pw1%pw_grid%grays
 

@@ -101,7 +101,7 @@ CONTAINS
       logger => cp_get_default_logger()
       iounit = cp_logger_get_default_io_unit(logger)
 
-      my_rank = v_ee%pw_grid%para%my_pos
+      my_rank = v_ee%pw_grid%para%rs_group%mepos
       num_pe = v_ee%pw_grid%para%group_size
       gid = v_ee%pw_grid%para%group
       tag = 1

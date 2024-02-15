@@ -59,7 +59,7 @@ CONTAINS
 
       group = pg1%para%group
       group_size = pg1%para%group_size
-      me = pg1%para%my_pos
+      me = pg1%para%rs_group%mepos
       ALLOCATE (ngr(group_size))
       ngr = 0
       ngr(me + 1) = pg1%ngpts_cut_local

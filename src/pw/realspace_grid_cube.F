@@ -141,7 +141,7 @@ CONTAINS
 
          ALLOCATE (buf(L3:U3))
 
-         my_rank = pw%pw_grid%para%my_pos
+         my_rank = pw%pw_grid%para%rs_group%mepos
          gid = pw%pw_grid%para%group
          num_pe = pw%pw_grid%para%group_size
          tag = 1
@@ -265,7 +265,7 @@ CONTAINS
       END IF
       !get rs grids and parallel environment
       gid = grid%pw_grid%para%group
-      my_rank = grid%pw_grid%para%my_pos
+      my_rank = grid%pw_grid%para%rs_group%mepos
       num_pe = grid%pw_grid%para%group_size
       tag = 1
 
@@ -402,7 +402,7 @@ CONTAINS
 
       !get rs grids and parallel envnment
       gid = grid%pw_grid%para%group
-      my_rank = grid%pw_grid%para%my_pos
+      my_rank = grid%pw_grid%para%rs_group%mepos
       num_pe = grid%pw_grid%para%group_size
       tag = 1
 
@@ -655,7 +655,7 @@ CONTAINS
 
       !get rs grids and parallel envnment
       gid = grid%pw_grid%para%group
-      my_rank = grid%pw_grid%para%my_pos
+      my_rank = grid%pw_grid%para%rs_group%mepos
 
       ! Shortcut
       lbounds = grid%pw_grid%bounds(1, :)
@@ -874,7 +874,7 @@ CONTAINS
       ALLOCATE (buf(L3:U3))
       IF (DOUBLE) ALLOCATE (buf2(L3:U3))
 
-      my_rank = pw%pw_grid%para%my_pos
+      my_rank = pw%pw_grid%para%rs_group%mepos
       gid = pw%pw_grid%para%group
       num_pe = pw%pw_grid%para%group_size
       tag = 1
