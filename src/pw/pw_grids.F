@@ -110,7 +110,7 @@ CONTAINS
       pw_grid%ngpts_cut_local = pw_grid%ngpts_local
       pw_grid%grid_span = FULLSPACE
       pw_grid%para%mode = PW_MODE_LOCAL
-      pw_grid%para%rs_dims = 0
+      pw_grid%para%rs_dims = 1
       pw_grid%reference = 0
       pw_grid%ref_count = 1
       NULLIFY (pw_grid%g)
@@ -125,6 +125,7 @@ CONTAINS
 
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm_self)
+      CALL pw_grid%para%rs_group%create(mp_comm_self, 2, pw_grid%para%rs_dims)
       pw_grid%para%group_size = pw_grid%para%group%num_pe
       pw_grid%para%rs_group%mepos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
