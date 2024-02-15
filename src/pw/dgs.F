@@ -22,11 +22,13 @@ MODULE dgs
                                               z_zero
    USE mathlib,                         ONLY: det_3x3,&
                                               inv_3x3
+   USE message_passing,                 ONLY: mp_comm_self,&
+                                              mp_comm_type
    USE pw_grid_info,                    ONLY: pw_find_cutoff
    USE pw_grid_types,                   ONLY: HALFSPACE,&
                                               pw_grid_type
    USE pw_grids,                        ONLY: pw_grid_change,&
-                                              pw_grid_setup
+                                              pw_grid_create
    USE pw_methods,                      ONLY: pw_copy,&
                                               pw_multiply_with,&
                                               pw_zero
@@ -84,18 +86,21 @@ CONTAINS
 !> \param cutoff_radius ...
 !> \param grid_s ...
 !> \param grid_b ...
+!> \param mp_comm ...
 !> \param grid_ref ...
 !> \param rs_dims ...
 !> \param iounit ...
 !> \param fft_usage ...
 ! **************************************************************************************************
    SUBROUTINE dg_pme_grid_setup(b_cell_hmat, npts_s, cutoff_radius, grid_s, grid_b, &
-                                grid_ref, rs_dims, iounit, fft_usage)
+                                mp_comm, grid_ref, rs_dims, iounit, fft_usage)
 
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: b_cell_hmat
       INTEGER, DIMENSION(:), INTENT(IN)                  :: npts_s
       REAL(KIND=dp), INTENT(IN)                          :: cutoff_radius
       TYPE(pw_grid_type), POINTER                        :: grid_s, grid_b
+
+      CLASS(mp_comm_type), INTENT(IN) :: mp_comm
       TYPE(pw_grid_type), INTENT(IN), OPTIONAL           :: grid_ref
       INTEGER, DIMENSION(2), INTENT(in), OPTIONAL        :: rs_dims
       INTEGER, INTENT(IN), OPTIONAL                      :: iounit
@@ -109,19 +114,19 @@ CONTAINS
 
       ecut = 0.5_dp*cutoff*cutoff
       IF (PRESENT(grid_ref)) THEN
-         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bounds_b, grid_span=HALFSPACE, cutoff=ecut, spherical=.TRUE., &
-                            ref_grid=grid_ref, rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
+         CALL pw_grid_create(grid_b, mp_comm, b_cell_hmat, bounds=bounds_b, grid_span=HALFSPACE, cutoff=ecut, spherical=.TRUE., &
+                             ref_grid=grid_ref, rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
       ELSE
-         CALL pw_grid_setup(b_cell_hmat, grid_b, bounds=bounds_b, grid_span=HALFSPACE, cutoff=ecut, spherical=.TRUE., &
-                            rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
+         CALL pw_grid_create(grid_b, mp_comm, b_cell_hmat, bounds=bounds_b, grid_span=HALFSPACE, cutoff=ecut, spherical=.TRUE., &
+                             rs_dims=rs_dims, iounit=iounit, fft_usage=fft_usage)
       END IF
 
       CALL dg_find_basis(grid_b%npts, b_cell_hmat, unit_cell_hmat)
 
       CALL dg_set_cell(bounds_s(2, :) - bounds_s(1, :) + 1, unit_cell_hmat, s_cell_hmat)
 
-      CALL pw_grid_setup(s_cell_hmat, grid_s, bounds=bounds_s, grid_span=HALFSPACE, &
-                         cutoff=ecut, iounit=iounit, fft_usage=fft_usage)
+      CALL pw_grid_create(grid_s, mp_comm_self, s_cell_hmat, bounds=bounds_s, grid_span=HALFSPACE, &
+                          cutoff=ecut, iounit=iounit, fft_usage=fft_usage)
 
    END SUBROUTINE dg_pme_grid_setup
 

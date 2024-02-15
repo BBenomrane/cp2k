@@ -27,8 +27,7 @@ MODULE ewald_spline_util
    USE message_passing,                 ONLY: mp_comm_self
    USE pw_grid_types,                   ONLY: HALFSPACE,&
                                               pw_grid_type
-   USE pw_grids,                        ONLY: pw_grid_create,&
-                                              pw_grid_setup
+   USE pw_grids,                        ONLY: pw_grid_create
    USE pw_methods,                      ONLY: pw_zero
    USE pw_pool_types,                   ONLY: pw_pool_create,&
                                               pw_pool_type
@@ -94,13 +93,12 @@ CONTAINS
       NULLIFY (cell)
 
       CALL cell_create(cell, hmat=hmat, periodic=(/1, 1, 1/))
-      CALL pw_grid_create(pw_grid, mp_comm_self)
       logger => cp_get_default_logger()
       iounit = cp_print_key_unit_nr(logger, print_section, "", &
                                     extension=".Log")
       bo(1, 1:3) = 0
       bo(2, 1:3) = npts(1:3) - 1
-      CALL pw_grid_setup(cell%hmat, pw_grid, grid_span=HALFSPACE, bounds=bo, iounit=iounit)
+      CALL pw_grid_create(pw_grid, mp_comm_self, cell%hmat, grid_span=HALFSPACE, bounds=bo, iounit=iounit)
 
       CALL cp_print_key_finished_output(iounit, logger, print_section, &
                                         "")
