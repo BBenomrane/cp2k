@@ -83,7 +83,7 @@ CONTAINS
       hy = pw_grid%dr(2)
       hz = pw_grid%dr(3)
 
-      nproc = PRODUCT(pw_grid%para%rs_dims)
+      nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
 
       iproc = pw_grid%para%rs_mpo
 
@@ -126,7 +126,7 @@ CONTAINS
       REAL(KIND=dp)                                      :: hx, hy, hz
 
       CALL timeset(routineN, handle)
-      nproc = PRODUCT(pw_grid%para%rs_dims)
+      nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
       iproc = pw_grid%para%rs_mpo
       geocode = wavelet%geocode
       nx = pw_grid%npts(1)
@@ -186,7 +186,7 @@ CONTAINS
 
       CPASSERT(ASSOCIATED(wavelet))
 
-      nproc = PRODUCT(pw_grid%para%rs_dims)
+      nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
       iproc = pw_grid%para%rs_mpo
       md2 = wavelet%PS_grid(3)
       m2 = pw_grid%npts(3)
@@ -237,8 +237,8 @@ CONTAINS
       IF (should_warn > 0 .AND. iproc == 0) &
          CPWARN("Density non-zero on the edges of the unit cell: wrong results in WAVELET solver")
 
-      DO i = 0, pw_grid%para%rs_dims(1) - 1
-         DO j = 0, pw_grid%para%rs_dims(2) - 1
+      DO i = 0, pw_grid%para%rs_group%num_pe_cart(1) - 1
+         DO j = 0, pw_grid%para%rs_group%num_pe_cart(2) - 1
             cart_pos = (/i, j/)
             CALL pw_grid%para%rs_group%rank_cart(cart_pos, dest)
             IF ((ub(1) .GE. lb(1)) .AND. (ub(2) .GE. lb(2))) THEN
@@ -254,8 +254,8 @@ CONTAINS
             ELSE
                scount(dest + 1) = 0
             END IF
-            lox = get_limit(pw_grid%npts(1), pw_grid%para%rs_dims(1), i)
-            loy = get_limit(pw_grid%npts(2), pw_grid%para%rs_dims(2), j)
+            lox = get_limit(pw_grid%npts(1), pw_grid%para%rs_group%num_pe_cart(1), i)
+            loy = get_limit(pw_grid%npts(2), pw_grid%para%rs_group%num_pe_cart(2), j)
             IF ((lox(2) .GE. lox(1)) .AND. (loy(2) .GE. loy(1))) THEN
                IF (iproc*local_z_dim .LE. m2) THEN
                   IF ((iproc + 1)*local_z_dim .LE. m2) THEN
@@ -283,13 +283,13 @@ CONTAINS
 
       wavelet%rho_z_sliced = 0.0_dp
 
-      DO i = 0, pw_grid%para%rs_dims(1) - 1
-         DO j = 0, pw_grid%para%rs_dims(2) - 1
+      DO i = 0, pw_grid%para%rs_group%num_pe_cart(1) - 1
+         DO j = 0, pw_grid%para%rs_group%num_pe_cart(2) - 1
             cart_pos = (/i, j/)
             CALL pw_grid%para%rs_group%rank_cart(cart_pos, dest)
 
-            lox = get_limit(pw_grid%npts(1), pw_grid%para%rs_dims(1), i)
-            loy = get_limit(pw_grid%npts(2), pw_grid%para%rs_dims(2), j)
+            lox = get_limit(pw_grid%npts(1), pw_grid%para%rs_group%num_pe_cart(1), i)
+            loy = get_limit(pw_grid%npts(2), pw_grid%para%rs_group%num_pe_cart(2), j)
             IF (iproc*local_z_dim .LE. m2) THEN
                IF ((iproc + 1)*local_z_dim .LE. m2) THEN
                   loz = local_z_dim
@@ -336,7 +336,7 @@ CONTAINS
 
       CPASSERT(ASSOCIATED(wavelet))
 
-      nproc = PRODUCT(pw_grid%para%rs_dims)
+      nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
       iproc = pw_grid%para%rs_mpo
       md2 = wavelet%PS_grid(3)
       m2 = pw_grid%npts(3)
@@ -363,10 +363,10 @@ CONTAINS
          loz = 0
       END IF
 
-      min_x = get_limit(pw_grid%npts(1), pw_grid%para%rs_dims(1), 0)
-      min_y = get_limit(pw_grid%npts(2), pw_grid%para%rs_dims(2), 0)
-      DO i = 0, pw_grid%para%rs_dims(1) - 1
-         DO j = 0, pw_grid%para%rs_dims(2) - 1
+      min_x = get_limit(pw_grid%npts(1), pw_grid%para%rs_group%num_pe_cart(1), 0)
+      min_y = get_limit(pw_grid%npts(2), pw_grid%para%rs_group%num_pe_cart(2), 0)
+      DO i = 0, pw_grid%para%rs_group%num_pe_cart(1) - 1
+         DO j = 0, pw_grid%para%rs_group%num_pe_cart(2) - 1
             cart_pos = (/i, j/)
             CALL pw_grid%para%rs_group%rank_cart(cart_pos, dest)
             IF ((ub(1) .GE. lb(1)) .AND. (ub(2) .GE. lb(2))) THEN
@@ -382,8 +382,8 @@ CONTAINS
             ELSE
                rcount(dest + 1) = 0
             END IF
-            lox = get_limit(pw_grid%npts(1), pw_grid%para%rs_dims(1), i)
-            loy = get_limit(pw_grid%npts(2), pw_grid%para%rs_dims(2), j)
+            lox = get_limit(pw_grid%npts(1), pw_grid%para%rs_group%num_pe_cart(1), i)
+            loy = get_limit(pw_grid%npts(2), pw_grid%para%rs_group%num_pe_cart(2), j)
             IF ((lox(2) .GE. lox(1)) .AND. (loy(2) .GE. loy(1))) THEN
                scount(dest + 1) = ABS((lox(2) - lox(1) + 1)*(loy(2) - loy(1) + 1)*loz)
                DO k = lox(1) - min_x(1) + 1, lox(2) - min_x(1) + 1
@@ -409,8 +409,8 @@ CONTAINS
 
       !!!! and now, how to put the right cubes to the right position!!!!!!
 
-      DO i = 0, pw_grid%para%rs_dims(1) - 1
-         DO j = 0, pw_grid%para%rs_dims(2) - 1
+      DO i = 0, pw_grid%para%rs_group%num_pe_cart(1) - 1
+         DO j = 0, pw_grid%para%rs_group%num_pe_cart(2) - 1
             cart_pos = (/i, j/)
             CALL pw_grid%para%rs_group%rank_cart(cart_pos, dest)
             IF (dest*local_z_dim .LE. m2) THEN
@@ -454,7 +454,7 @@ CONTAINS
       REAL(KIND=dp)                                      :: hx, hy, hz
 
       CALL timeset(routineN, handle)
-      nproc = PRODUCT(pw_grid%para%rs_dims)
+      nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
       iproc = pw_grid%para%rs_mpo
       geocode = wavelet%geocode
       nx = pw_grid%npts(1)

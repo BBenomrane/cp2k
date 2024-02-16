@@ -164,10 +164,7 @@ CONTAINS
       pos_of_x(:pw_grid_out%bounds(2, 1) - 1) = pw_grid_in%para%pos_of_x
       pos_of_x(pw_grid_out%bounds(2, 1)) = pos_of_x(pw_grid_out%bounds(2, 1) - 1)
       CALL MOVE_ALLOC(pos_of_x, pw_grid_out%para%pos_of_x)
-      pw_grid_out%para%rs_dims = pw_grid_in%para%rs_dims
-      IF (PRODUCT(pw_grid_in%para%rs_dims) /= 0) THEN
-         CALL pw_grid_out%para%rs_group%from_dup(pw_grid_in%para%rs_group)
-      END IF
+      CALL pw_grid_out%para%rs_group%from_dup(pw_grid_in%para%rs_group)
       pw_grid_out%para%rs_pos = pw_grid_in%para%rs_pos
       pw_grid_out%para%rs_mpo = pw_grid_in%para%rs_mpo
 

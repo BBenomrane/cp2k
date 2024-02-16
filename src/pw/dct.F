@@ -230,7 +230,7 @@ CONTAINS
 
       CALL pw_grid_create(dct_pw_grid, pw_grid%para%rs_group, hmat2, &
                           bounds=bounds_new, &
-                          rs_dims=pw_grid%para%rs_dims, &
+                          rs_dims=pw_grid%para%rs_group%num_pe_cart, &
                           blocked=blocked, &
                           bounds_local=bounds_local_new)
 
@@ -323,7 +323,7 @@ CONTAINS
       rs_group = pw_grid%para%rs_group
       rs_mpo = pw_grid%para%rs_mpo
       group_size = pw_grid%para%rs_group%num_pe
-      rs_dims = pw_grid%para%rs_dims
+      rs_dims = pw_grid%para%rs_group%num_pe_cart
 
       rs_pos = pw_grid%para%rs_pos
       rs_dim1 = rs_dims(1); rs_dim2 = rs_dims(2)

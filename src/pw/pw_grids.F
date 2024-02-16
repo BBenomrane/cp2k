@@ -2236,8 +2236,7 @@ CONTAINS
             END IF
             ! also release groups
             CALL pw_grid%para%group%free()
-            IF (PRODUCT(pw_grid%para%rs_dims) /= 0) &
-               CALL pw_grid%para%rs_group%free()
+            CALL pw_grid%para%rs_group%free()
             IF (ALLOCATED(pw_grid%para%pos_of_x)) THEN
                DEALLOCATE (pw_grid%para%pos_of_x)
             END IF

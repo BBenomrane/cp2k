@@ -223,7 +223,7 @@ CONTAINS
             settings%cutoff(iforce_eval) = auxbas_pw_pool%pw_grid%cutoff
             settings%rel_cutoff(iforce_eval) = dft_control%qs_control%relative_cutoff
             IF (auxbas_pw_pool%pw_grid%spherical) settings%spherical(iforce_eval) = 1
-            settings%rs_dims(:, iforce_eval) = auxbas_pw_pool%pw_grid%para%rs_dims
+            settings%rs_dims(:, iforce_eval) = auxbas_pw_pool%pw_grid%para%rs_group%num_pe_cart
             IF (auxbas_pw_pool%pw_grid%grid_span == HALFSPACE) settings%odd(iforce_eval) = 1
             ! Becke constraint atoms/coeffs
             IF (cdft_control%natoms .GT. SIZE(settings%atoms, 1)) &
@@ -733,11 +733,11 @@ CONTAINS
                              iounit=iounit)
          ! Check if the layout was successfully created
          IF (mixed_cdft%is_special) THEN
-            IF (.NOT. pw_grid%para%rs_dims(2) /= 1) is_match = .FALSE.
+            IF (.NOT. pw_grid%para%rs_group%num_pe_cart(2) /= 1) is_match = .FALSE.
          ELSE IF (mixed_cdft%is_pencil) THEN
-            IF (.NOT. pw_grid%para%rs_dims(1) == mixed_rs_dims(1)) is_match = .FALSE.
+            IF (.NOT. pw_grid%para%rs_group%num_pe_cart(1) == mixed_rs_dims(1)) is_match = .FALSE.
          ELSE
-            IF (.NOT. pw_grid%para%rs_dims(2) == 1) is_match = .FALSE.
+            IF (.NOT. pw_grid%para%rs_group%num_pe_cart(2) == 1) is_match = .FALSE.
          END IF
          IF (.NOT. is_match) &
             CALL cp_abort(__LOCATION__, &
