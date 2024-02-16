@@ -159,9 +159,6 @@ CONTAINS
       pw_grid_out%cutoff = pw_grid_in%cutoff
 
       !para
-      pw_grid_out%para%group_head_id = pw_grid_in%para%group_head_id
-      pw_grid_out%para%group_head = &
-         (pw_grid_out%para%group_head_id == pw_grid_out%para%rs_group%mepos)
       pw_grid_out%para%mode = pw_mode_loc
       ALLOCATE (pos_of_x(pw_grid_out%bounds(1, 1):pw_grid_out%bounds(2, 1)))
       pos_of_x(:pw_grid_out%bounds(2, 1) - 1) = pw_grid_in%para%pos_of_x

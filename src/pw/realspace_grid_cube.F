@@ -457,7 +457,7 @@ CONTAINS
          CALL close_file(unit_number=extunit_handle)
       END IF
       ! Sync offset and start parallel read
-      CALL gid%bcast(offset_global, grid%pw_grid%para%group_head_id)
+      CALL gid%bcast(offset_global, grid%pw_grid%para%rs_group%source)
       BOF = offset_global
       CALL extunit%open(groupid=gid, filepath=filename, amode_status=file_amode_rdonly)
       ! Determine byte offsets for each grid z-slice which are local to a process
@@ -743,7 +743,7 @@ CONTAINS
          END IF
       END IF
       ! Sync offset
-      CALL gid%bcast(BOF, grid%pw_grid%para%group_head_id)
+      CALL gid%bcast(BOF, grid%pw_grid%para%rs_group%source)
       ! Determine byte offsets for each grid z-slice which are local to a process
       ! and convert z-slices to cube format compatible strings
       ALLOCATE (displacements(nslices))

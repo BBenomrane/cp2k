@@ -110,7 +110,6 @@ MODULE realspace_grid_types
       ! they are most useful for fully distributed grids, where they reflect the topology of the grid
       TYPE(mp_comm_type) :: group = mp_comm_null
       INTEGER :: my_pos = -1
-      LOGICAL :: group_head = .FALSE.
       INTEGER :: group_size = 0
       INTEGER, DIMENSION(3) :: group_dim = -1
       INTEGER, DIMENSION(3) :: group_coor = -1
@@ -250,7 +249,6 @@ CONTAINS
          desc%distributed = .FALSE.
          desc%group = mp_comm_null
          desc%group_size = 1
-         desc%group_head = .TRUE.
          desc%group_dim = 1
          desc%group_coor = 0
          desc%my_pos = 0
@@ -359,7 +357,6 @@ CONTAINS
             END IF
             desc%distributed = .FALSE.
             desc%parallel = .TRUE.
-            desc%group_head = pw_grid%para%group_head
             desc%group_coor(:) = 0
             desc%my_virtual_pos = 0
 
@@ -386,7 +383,6 @@ CONTAINS
             ! we are going parallel on the real space grid
             desc%parallel = .TRUE.
             desc%distributed = .TRUE.
-            desc%group_head = (desc%my_pos == 0)
 
             ! set up global info about the distribution
             ALLOCATE (desc%rank2coord(3, 0:desc%group_size - 1))

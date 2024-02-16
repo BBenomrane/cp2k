@@ -126,9 +126,6 @@ CONTAINS
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm_self)
       CALL pw_grid%para%rs_group%create(mp_comm_self, 2, pw_grid%para%rs_dims)
-      pw_grid%para%group_head_id = 0
-      pw_grid%para%group_head = &
-         (pw_grid%para%group_head_id == pw_grid%para%rs_group%mepos)
       IF (pw_grid%para%rs_group%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -334,9 +331,6 @@ CONTAINS
 
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm)
-      pw_grid%para%group_head_id = 0
-      pw_grid%para%group_head = &
-         (pw_grid%para%group_head_id == pw_grid%para%group%mepos)
       IF (mp_comm%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -726,7 +720,7 @@ CONTAINS
          n(3) = MINVAL(pw_grid%para%nyzray)
          rv(:, 3) = REAL(n, KIND=dp)
 
-         IF (pw_grid%para%group_head .AND. info > 0) THEN
+         IF (info > 0) THEN
             WRITE (info, '(/,A,T71,I10)') &
                " PW_GRID| Information for grid number ", pw_grid%id_nr
             IF (pw_grid%reference > 0) THEN

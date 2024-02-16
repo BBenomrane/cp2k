@@ -1351,7 +1351,7 @@ CONTAINS
                                     !..parallel FFT
                                     !
 
-                                    IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) THEN
+                                    IF (test .AND. out_unit > 0) THEN
                                        WRITE (out_unit, '(A)') " FFT Protocol "
                                        #:if space=="rs"
                                           WRITE (out_unit, '(A,T76,A)') "  Transform direction ", "FWFFT"
@@ -1385,7 +1385,7 @@ CONTAINS
                                                         pw1%pw_grid%para%bo, scale=norm, debug=test)
                                           END IF
                                           !..prepare output
-                                          IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
+                                          IF (test .AND. out_unit > 0) &
                                              WRITE (out_unit, '(A)') "  PW_GATHER : 2d -> 1d "
                                           CALL pw_gather_p_${kind2}$ (pw2, grays)
                                        #:elif kind=="r3d" and kind2=="c1d"
@@ -1412,7 +1412,7 @@ CONTAINS
                                                            pw1%pw_grid%para%bo, scale=norm, debug=test)
                                              END IF
                                              !..prepare output
-                                             IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
+                                             IF (test .AND. out_unit > 0) &
                                                 WRITE (out_unit, '(A)') "  PW_GATHER : 2d -> 1d "
                                              CALL pw_gather_p_${kind2}$ (pw2, grays)
                                              DEALLOCATE (c_in)
@@ -1424,7 +1424,7 @@ CONTAINS
                                     #:else
                                        #:if kind=="c1d" and kind2=="c3d"
                                           !..prepare input
-                                          IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
+                                          IF (test .AND. out_unit > 0) &
                                              WRITE (out_unit, '(A)') "  PW_SCATTER : 2d -> 1d "
                                           grays = z_zero
                                           CALL pw_scatter_p_${kind}$ (pw1, grays)
@@ -1449,7 +1449,7 @@ CONTAINS
                                           ELSE
 #endif
 !..   prepare input
-                                             IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
+                                             IF (test .AND. out_unit > 0) &
                                                 WRITE (out_unit, '(A)') "  PW_SCATTER : 2d -> 1d "
                                              grays = z_zero
                                              CALL pw_scatter_p_${kind}$ (pw1, grays)
@@ -1466,7 +1466,7 @@ CONTAINS
                                                            pw1%pw_grid%para%bo, scale=norm, debug=test)
                                              END IF
                                              !..prepare output
-                                             IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) &
+                                             IF (test .AND. out_unit > 0) &
                                                 WRITE (out_unit, '(A)') "  Real part "
                                              CALL pw_copy_from_array(pw2, c_in)
                                              DEALLOCATE (c_in)
@@ -1477,7 +1477,7 @@ CONTAINS
                                     #:endif
                                  END IF
 
-                                 IF (test .AND. pw1%pw_grid%para%group_head .AND. out_unit > 0) THEN
+                                 IF (test .AND. out_unit > 0) THEN
                                     WRITE (out_unit, '(A)') " End of FFT Protocol "
                                  END IF
 
