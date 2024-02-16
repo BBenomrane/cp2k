@@ -255,7 +255,7 @@ CONTAINS
       ELSE
          ! group size of desc grid
          ! global grid dimensions are still the same
-         desc%group_size = pw_grid%para%rs_group%num_pe
+         desc%group_size = pw_grid%para%group%num_pe
          desc%npts = pw_grid%npts
          desc%ngpts = PRODUCT(INT(desc%npts, KIND=int_8))
          desc%lb = pw_grid%bounds(1, :)
@@ -768,8 +768,8 @@ CONTAINS
       INTEGER, DIMENSION(3)                              :: lb, ub
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:)           :: recvbuf, sendbuf, swaparray
 
-   ASSOCIATE (np => pw%pw_grid%para%rs_group%num_pe, bo => pw%pw_grid%para%bo(1:2, 1:3, 0:pw%pw_grid%para%rs_group%num_pe - 1, 1), &
-                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%rs_group, mepos => pw%pw_grid%para%rs_group%mepos, &
+      ASSOCIATE (np => pw%pw_grid%para%group%num_pe, bo => pw%pw_grid%para%bo(1:2, 1:3, 0:pw%pw_grid%para%group%num_pe - 1, 1), &
+                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%group, mepos => pw%pw_grid%para%group%mepos, &
                  grid => rs%r)
          ALLOCATE (rcount(0:np - 1))
          DO ip = 1, np
@@ -838,8 +838,8 @@ CONTAINS
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:)           :: recvbuf, sendbuf, swaparray
       TYPE(mp_request_type), DIMENSION(2)                :: req
 
-   ASSOCIATE (np => pw%pw_grid%para%rs_group%num_pe, bo => pw%pw_grid%para%bo(1:2, 1:3, 0:pw%pw_grid%para%rs_group%num_pe - 1, 1), &
-                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%rs_group, mepos => pw%pw_grid%para%rs_group%mepos, &
+      ASSOCIATE (np => pw%pw_grid%para%group%num_pe, bo => pw%pw_grid%para%bo(1:2, 1:3, 0:pw%pw_grid%para%group%num_pe - 1, 1), &
+                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%group, mepos => pw%pw_grid%para%group%mepos, &
                  grid => rs%r)
          ALLOCATE (rcount(0:np - 1))
          DO ip = 1, np
@@ -1202,22 +1202,22 @@ CONTAINS
       END DO
 
       ! This is the real redistribution
-      ALLOCATE (bounds(0:pw%pw_grid%para%rs_group%num_pe - 1, 1:4))
+      ALLOCATE (bounds(0:pw%pw_grid%para%group%num_pe - 1, 1:4))
 
       ! work out the pw grid points each proc holds
-      DO i = 0, pw%pw_grid%para%rs_group%num_pe - 1
+      DO i = 0, pw%pw_grid%para%group%num_pe - 1
          bounds(i, 1:2) = pw%pw_grid%para%bo(1:2, 1, i, 1)
          bounds(i, 3:4) = pw%pw_grid%para%bo(1:2, 2, i, 1)
          bounds(i, 1:2) = bounds(i, 1:2) - pw%pw_grid%npts(1)/2 - 1
          bounds(i, 3:4) = bounds(i, 3:4) - pw%pw_grid%npts(2)/2 - 1
       END DO
 
-      ALLOCATE (send_tasks(0:pw%pw_grid%para%rs_group%num_pe - 1, 1:6))
-      ALLOCATE (send_sizes(0:pw%pw_grid%para%rs_group%num_pe - 1))
-      ALLOCATE (send_disps(0:pw%pw_grid%para%rs_group%num_pe - 1))
-      ALLOCATE (recv_tasks(0:pw%pw_grid%para%rs_group%num_pe - 1, 1:6))
-      ALLOCATE (recv_sizes(0:pw%pw_grid%para%rs_group%num_pe - 1))
-      ALLOCATE (recv_disps(0:pw%pw_grid%para%rs_group%num_pe - 1))
+      ALLOCATE (send_tasks(0:pw%pw_grid%para%group%num_pe - 1, 1:6))
+      ALLOCATE (send_sizes(0:pw%pw_grid%para%group%num_pe - 1))
+      ALLOCATE (send_disps(0:pw%pw_grid%para%group%num_pe - 1))
+      ALLOCATE (recv_tasks(0:pw%pw_grid%para%group%num_pe - 1, 1:6))
+      ALLOCATE (recv_sizes(0:pw%pw_grid%para%group%num_pe - 1))
+      ALLOCATE (recv_disps(0:pw%pw_grid%para%group%num_pe - 1))
       send_tasks(:, 1) = 1
       send_tasks(:, 2) = 0
       send_tasks(:, 3) = 1
@@ -1228,7 +1228,7 @@ CONTAINS
       recv_sizes = 0
 
       my_rs_rank = rs%desc%my_pos
-      my_pw_rank = pw%pw_grid%para%rs_group%mepos
+      my_pw_rank = pw%pw_grid%para%group%mepos
 
       ! find the processors that should hold our data
       ! should be part of the rs grid type
@@ -1280,7 +1280,7 @@ CONTAINS
       ub_recv(:) = ub_send(:)
 !$OMP PARALLEL DO DEFAULT(NONE), &
 !$OMP             SHARED(pw,lb_send,ub_send,bounds,send_tasks,send_sizes)
-      DO j = 0, pw%pw_grid%para%rs_group%num_pe - 1
+      DO j = 0, pw%pw_grid%para%group%num_pe - 1
 
          IF (lb_send(1) .GT. bounds(j, 2)) CYCLE
          IF (ub_send(1) .LT. bounds(j, 1)) CYCLE
@@ -1301,7 +1301,7 @@ CONTAINS
 
       send_disps(0) = 0
       recv_disps(0) = 0
-      DO i = 1, pw%pw_grid%para%rs_group%num_pe - 1
+      DO i = 1, pw%pw_grid%para%group%num_pe - 1
          send_disps(i) = send_disps(i - 1) + send_sizes(i - 1)
          recv_disps(i) = recv_disps(i - 1) + recv_sizes(i - 1)
       END DO
@@ -1461,21 +1461,21 @@ CONTAINS
 
       ! This is the real redistribution
 
-      ALLOCATE (bounds(0:pw%pw_grid%para%rs_group%num_pe - 1, 1:4))
+      ALLOCATE (bounds(0:pw%pw_grid%para%group%num_pe - 1, 1:4))
 
-      DO i = 0, pw%pw_grid%para%rs_group%num_pe - 1
+      DO i = 0, pw%pw_grid%para%group%num_pe - 1
          bounds(i, 1:2) = pw%pw_grid%para%bo(1:2, 1, i, 1)
          bounds(i, 3:4) = pw%pw_grid%para%bo(1:2, 2, i, 1)
          bounds(i, 1:2) = bounds(i, 1:2) - pw%pw_grid%npts(1)/2 - 1
          bounds(i, 3:4) = bounds(i, 3:4) - pw%pw_grid%npts(2)/2 - 1
       END DO
 
-      ALLOCATE (send_tasks(0:pw%pw_grid%para%rs_group%num_pe - 1, 1:6))
-      ALLOCATE (send_sizes(0:pw%pw_grid%para%rs_group%num_pe - 1))
-      ALLOCATE (send_disps(0:pw%pw_grid%para%rs_group%num_pe - 1))
-      ALLOCATE (recv_tasks(0:pw%pw_grid%para%rs_group%num_pe - 1, 1:6))
-      ALLOCATE (recv_sizes(0:pw%pw_grid%para%rs_group%num_pe - 1))
-      ALLOCATE (recv_disps(0:pw%pw_grid%para%rs_group%num_pe - 1))
+      ALLOCATE (send_tasks(0:pw%pw_grid%para%group%num_pe - 1, 1:6))
+      ALLOCATE (send_sizes(0:pw%pw_grid%para%group%num_pe - 1))
+      ALLOCATE (send_disps(0:pw%pw_grid%para%group%num_pe - 1))
+      ALLOCATE (recv_tasks(0:pw%pw_grid%para%group%num_pe - 1, 1:6))
+      ALLOCATE (recv_sizes(0:pw%pw_grid%para%group%num_pe - 1))
+      ALLOCATE (recv_disps(0:pw%pw_grid%para%group%num_pe - 1))
 
       send_tasks = 0
       send_tasks(:, 1) = 1
@@ -1496,7 +1496,7 @@ CONTAINS
       recv_sizes = 0
 
       my_rs_rank = rs%desc%my_pos
-      my_pw_rank = pw%pw_grid%para%rs_group%mepos
+      my_pw_rank = pw%pw_grid%para%group%mepos
 
       ! find the processors that should hold our data
       ! should be part of the rs grid type
@@ -1509,7 +1509,7 @@ CONTAINS
 !$OMP PARALLEL DO DEFAULT(NONE), &
 !$OMP             PRIVATE(coords,idir,pos,lb_send,ub_send), &
 !$OMP             SHARED(rs,bounds,my_rs_rank,send_tasks,send_sizes,pw)
-      DO i = 0, pw%pw_grid%para%rs_group%num_pe - 1
+      DO i = 0, pw%pw_grid%para%group%num_pe - 1
 
          coords(:) = rs%desc%rank2coord(:, rs%desc%real2virtual(i))
          !calculate the real rs grid points on each processor
@@ -1551,7 +1551,7 @@ CONTAINS
 
 !$OMP PARALLEL DO DEFAULT(NONE), &
 !$OMP             SHARED(pw,lb_send,ub_send,bounds,recv_tasks,recv_sizes)
-      DO j = 0, pw%pw_grid%para%rs_group%num_pe - 1
+      DO j = 0, pw%pw_grid%para%group%num_pe - 1
 
          IF (ub_send(1) .LT. bounds(j, 1)) CYCLE
          IF (lb_send(1) .GT. bounds(j, 2)) CYCLE
@@ -1572,7 +1572,7 @@ CONTAINS
 
       send_disps(0) = 0
       recv_disps(0) = 0
-      DO i = 1, pw%pw_grid%para%rs_group%num_pe - 1
+      DO i = 1, pw%pw_grid%para%group%num_pe - 1
          send_disps(i) = send_disps(i - 1) + send_sizes(i - 1)
          recv_disps(i) = recv_disps(i - 1) + recv_sizes(i - 1)
       END DO

@@ -125,10 +125,9 @@ CONTAINS
       pw_grid%id_nr = grid_tag
 
       ! parallel info
-      CALL pw_grid%para%group%from_dup(mp_comm_self)
       rs_dims = 1
-      CALL pw_grid%para%rs_group%create(mp_comm_self, 2, rs_dims)
-      IF (pw_grid%para%rs_group%num_pe > 1) THEN
+      CALL pw_grid%para%group%create(mp_comm_self, 2, rs_dims)
+      IF (pw_grid%para%group%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
          pw_grid%para%mode = PW_MODE_LOCAL
@@ -331,7 +330,6 @@ CONTAINS
       pw_grid%id_nr = grid_tag
 
       ! parallel info
-      CALL pw_grid%para%group%from_dup(mp_comm)
       IF (mp_comm%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -585,7 +583,7 @@ CONTAINS
       END IF
 
       ! Distribute grid
-      CALL pw_grid_distribute(pw_grid, yz_mask, bounds_local=bounds_local, ref_grid=ref_grid, blocked=blocked, &
+      CALL pw_grid_distribute(pw_grid, mp_comm, yz_mask, bounds_local=bounds_local, ref_grid=ref_grid, blocked=blocked, &
                               rs_dims=rs_dims)
 
       ! Allocate the grid fields
@@ -709,7 +707,7 @@ CONTAINS
          n(2) = pw_grid%ngpts_local
          CALL pw_grid%para%group%sum(n(1:2))
          n(3) = SUM(pw_grid%para%nyzray)
-         rv(:, 1) = REAL(n, KIND=dp)/REAL(pw_grid%para%rs_group%num_pe, KIND=dp)
+         rv(:, 1) = REAL(n, KIND=dp)/REAL(pw_grid%para%group%num_pe, KIND=dp)
          n(1) = pw_grid%ngpts_cut_local
          n(2) = pw_grid%ngpts_local
          CALL pw_grid%para%group%max(n(1:2))
@@ -729,10 +727,10 @@ CONTAINS
                   " PW_GRID| Number of the reference grid ", pw_grid%reference
             END IF
             WRITE (info, '(A,T60,I10,A)') &
-               " PW_GRID| Grid distributed over ", pw_grid%para%rs_group%num_pe, &
+               " PW_GRID| Grid distributed over ", pw_grid%para%group%num_pe, &
                " processors"
             WRITE (info, '(A,T71,2I5)') &
-               " PW_GRID| Real space group dimensions ", pw_grid%para%rs_group%num_pe_cart
+               " PW_GRID| Real space group dimensions ", pw_grid%para%group%num_pe_cart
             IF (pw_grid%para%blocked) THEN
                WRITE (info, '(A,T78,A)') " PW_GRID| the grid is blocked: ", "YES"
             ELSE
@@ -775,6 +773,7 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief Distribute grids in real and Fourier Space to the processors in group
 !> \param pw_grid ...
+!> \param mp_comm ...
 !> \param yz_mask ...
 !> \param bounds_local ...
 !> \param ref_grid ...
@@ -786,9 +785,11 @@ CONTAINS
 !>      JGH (09-Sep-2003) reduce scaling for distribution
 !> \author JGH (22-12-2000)
 ! **************************************************************************************************
-   SUBROUTINE pw_grid_distribute(pw_grid, yz_mask, bounds_local, ref_grid, blocked, rs_dims)
+   SUBROUTINE pw_grid_distribute(pw_grid, mp_comm, yz_mask, bounds_local, ref_grid, blocked, rs_dims)
 
       TYPE(pw_grid_type), INTENT(INOUT)                  :: pw_grid
+
+      CLASS(mp_comm_type), INTENT(IN) :: mp_comm
       INTEGER, DIMENSION(:, :), INTENT(INOUT)            :: yz_mask
       INTEGER, DIMENSION(2, 3), INTENT(IN), OPTIONAL     :: bounds_local
       TYPE(pw_grid_type), INTENT(IN), OPTIONAL           :: ref_grid
@@ -841,8 +842,7 @@ CONTAINS
          CPASSERT(pw_grid%ngpts < HUGE(pw_grid%ngpts_local))
          pw_grid%ngpts_local = INT(pw_grid%ngpts)
          my_rs_dims = 1
-         CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
-                                           my_rs_dims)
+         CALL pw_grid%para%group%create(mp_comm, 2, my_rs_dims)
 
          ALLOCATE (pw_grid%para%bo(2, 3, 0:0, 3))
          DO i = 1, 3
@@ -856,7 +856,7 @@ CONTAINS
          nx = pw_grid%npts(1)
          ny = pw_grid%npts(2)
          nz = pw_grid%npts(3)
-         np = pw_grid%para%group%num_pe
+         np = mp_comm%num_pe
 
          ! The user can specify 2 strictly positive indices => specific layout
          !                      1 strictly positive index   => the other is fixed by the number of CPUs
@@ -923,17 +923,16 @@ CONTAINS
          END SELECT
 
          !..create group for real space distribution
-         CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
-                                           my_rs_dims)
+         CALL pw_grid%para%group%create(mp_comm, 2, my_rs_dims)
 
          IF (PRESENT(bounds_local)) THEN
             pw_grid%bounds_local = bounds_local
          ELSE
-            lo = get_limit(nx, pw_grid%para%rs_group%num_pe_cart(1), &
-                           pw_grid%para%rs_group%mepos_cart(1))
+            lo = get_limit(nx, pw_grid%para%group%num_pe_cart(1), &
+                           pw_grid%para%group%mepos_cart(1))
             pw_grid%bounds_local(:, 1) = lo + pw_grid%bounds(1, 1) - 1
-            lo = get_limit(ny, pw_grid%para%rs_group%num_pe_cart(2), &
-                           pw_grid%para%rs_group%mepos_cart(2))
+            lo = get_limit(ny, pw_grid%para%group%num_pe_cart(2), &
+                           pw_grid%para%group%mepos_cart(2))
             pw_grid%bounds_local(:, 2) = lo + pw_grid%bounds(1, 2) - 1
             pw_grid%bounds_local(:, 3) = pw_grid%bounds(:, 3)
          END IF
@@ -943,7 +942,7 @@ CONTAINS
 
          !..the third distribution is needed for the second step in the FFT
          ALLOCATE (pw_grid%para%bo(2, 3, 0:np - 1, 3))
-         rsd = pw_grid%para%rs_group%num_pe_cart
+         rsd = pw_grid%para%group%num_pe_cart
 
          IF (PRESENT(bounds_local)) THEN
             ! axis_dist tells what portion of 1 .. nx , 1 .. ny , 1 .. nz are in the current process
@@ -951,9 +950,9 @@ CONTAINS
                axis_dist(:, i) = bounds_local(:, i) - pw_grid%bounds(1, i) + 1
             END DO
             ALLOCATE (axis_dist_all(2, 3, np))
-            CALL pw_grid%para%rs_group%allgather(axis_dist, axis_dist_all)
+            CALL pw_grid%para%group%allgather(axis_dist, axis_dist_all)
             DO ip = 0, np - 1
-               CALL pw_grid%para%rs_group%coords(ip, coor)
+               CALL pw_grid%para%group%coords(ip, coor)
                ! distribution xyZ
                pw_grid%para%bo(1:2, 1, ip, 1) = axis_dist_all(1:2, 1, ip + 1)
                pw_grid%para%bo(1:2, 2, ip, 1) = axis_dist_all(1:2, 2, ip + 1)
@@ -973,7 +972,7 @@ CONTAINS
             DEALLOCATE (axis_dist_all)
          ELSE
             DO ip = 0, np - 1
-               CALL pw_grid%para%rs_group%coords(ip, coor)
+               CALL pw_grid%para%group%coords(ip, coor)
                ! distribution xyZ
                pw_grid%para%bo(1:2, 1, ip, 1) = get_limit(nx, rsd(1), coor(1))
                pw_grid%para%bo(1:2, 2, ip, 1) = get_limit(ny, rsd(2), coor(2))
@@ -1026,7 +1025,7 @@ CONTAINS
                yz_mask(lo(1), lo(2)) = 0
                ip = MOD(i - 1, 2*np)
                IF (ip > np - 1) ip = 2*np - ip - 1
-               IF (ip == pw_grid%para%rs_group%mepos) THEN
+               IF (ip == pw_grid%para%group%mepos) THEN
                   pw_grid%ngpts_cut_local = pw_grid%ngpts_cut_local + gmax
                END IF
                pw_grid%para%yzq(lo(1), lo(2)) = ip
@@ -1065,7 +1064,7 @@ CONTAINS
                      ns = pw_grid%para%nyzray(ip)
                      pw_grid%para%yzp(1, ns, ip) = j
                      pw_grid%para%yzp(2, ns, ip) = i
-                     IF (ip == pw_grid%para%rs_group%mepos) THEN
+                     IF (ip == pw_grid%para%group%mepos) THEN
                         pw_grid%para%yzq(j, i) = ns
                      ELSE
                         pw_grid%para%yzq(j, i) = -1
@@ -1094,7 +1093,7 @@ CONTAINS
                pw_grid%para%nyzray(ip) = n*m
             END DO
 
-            ipl = pw_grid%para%rs_group%mepos
+            ipl = pw_grid%para%group%mepos
             l = pw_grid%para%bo(2, 1, ipl, 3) - &
                 pw_grid%para%bo(1, 1, ipl, 3) + 1
             m = pw_grid%para%bo(2, 2, ipl, 3) - &
@@ -1124,7 +1123,7 @@ CONTAINS
 
             ALLOCATE (pemap(0:np - 1))
             pemap = 0
-            pemap(pw_grid%para%rs_group%mepos) = pw_grid%para%rs_group%mepos
+            pemap(pw_grid%para%group%mepos) = pw_grid%para%group%mepos
             CALL pw_grid%para%group%sum(pemap)
 
             DO ip = 0, np - 1
@@ -1155,7 +1154,7 @@ CONTAINS
       IF (pw_grid%para%mode .EQ. PW_MODE_DISTRIBUTED) THEN
          ALLOCATE (pw_grid%para%pos_of_x(pw_grid%bounds(1, 1):pw_grid%bounds(2, 1)))
          pw_grid%para%pos_of_x = 0
-         pw_grid%para%pos_of_x(pw_grid%bounds_local(1, 1):pw_grid%bounds_local(2, 1)) = pw_grid%para%rs_group%mepos
+         pw_grid%para%pos_of_x(pw_grid%bounds_local(1, 1):pw_grid%bounds_local(2, 1)) = pw_grid%para%group%mepos
          CALL pw_grid%para%group%sum(pw_grid%para%pos_of_x)
       ELSE
          ! this should not be needed
@@ -1194,7 +1193,7 @@ CONTAINS
       mz = SIZE(yz_mask, 2)
 
       ! loop over all processors and all g vectors yz lines on this processor
-      DO ip = 0, ref_grid%para%rs_group%num_pe - 1
+      DO ip = 0, ref_grid%para%group%num_pe - 1
          DO ig = 1, ref_grid%para%nyzray(ip)
             ! go from mapped coordinates to original coordinates
             ! 1, 2, ..., n-1, n -> 0, 1, ..., (n/2)-1, -(n/2), -(n/2)+1, ..., -2, -1
@@ -1226,7 +1225,7 @@ CONTAINS
                yz_mask(y, z) = 0
                pw_grid%para%yzq(y, z) = ip
             END IF
-            IF (ip == pw_grid%para%rs_group%mepos) THEN
+            IF (ip == pw_grid%para%group%mepos) THEN
                pw_grid%ngpts_cut_local = pw_grid%ngpts_cut_local + gmax
             END IF
          END DO
@@ -1506,7 +1505,7 @@ CONTAINS
          IF (pw_grid%para%ray_distribution) THEN
 
             gpt = 0
-            ip = pw_grid%para%rs_group%mepos
+            ip = pw_grid%para%group%mepos
             DO i = 1, pw_grid%para%nyzray(ip)
                n = pw_grid%para%yzp(2, i, ip) + lbz - 1
                m = pw_grid%para%yzp(1, i, ip) + lby - 1
@@ -1534,7 +1533,7 @@ CONTAINS
 
          ELSE
 
-            bol = pw_grid%para%bo(:, :, pw_grid%para%rs_group%mepos, 3)
+            bol = pw_grid%para%bo(:, :, pw_grid%para%group%mepos, 3)
             gpt = 0
             DO n = bounds(1, 3), bounds(2, 3)
                IF (n < 0) THEN
@@ -1725,7 +1724,7 @@ CONTAINS
 
       IF (pw_grid%para%mode == PW_MODE_DISTRIBUTED) THEN
          ALLOCATE (pw_grid%grays(pw_grid%npts(1), &
-                                 pw_grid%para%nyzray(pw_grid%para%rs_group%mepos)))
+                                 pw_grid%para%nyzray(pw_grid%para%group%mepos)))
       END IF
 
       ALLOCATE (pw_grid%mapl%pos(bounds(1, 1):bounds(2, 1)))
@@ -2061,7 +2060,7 @@ CONTAINS
             END DO
          END IF
 
-         ip = pw_grid%para%rs_group%mepos
+         ip = pw_grid%para%group%mepos
          is = 0
          DO i = 1, nz
             DO j = 1, ny
@@ -2231,7 +2230,6 @@ CONTAINS
             END IF
             ! also release groups
             CALL pw_grid%para%group%free()
-            CALL pw_grid%para%rs_group%free()
             IF (ALLOCATED(pw_grid%para%pos_of_x)) THEN
                DEALLOCATE (pw_grid%para%pos_of_x)
             END IF
