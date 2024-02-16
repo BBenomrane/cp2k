@@ -126,11 +126,10 @@ CONTAINS
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm_self)
       CALL pw_grid%para%rs_group%create(mp_comm_self, 2, pw_grid%para%rs_dims)
-      pw_grid%para%group_size = pw_grid%para%group%num_pe
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
          (pw_grid%para%group_head_id == pw_grid%para%rs_group%mepos)
-      IF (pw_grid%para%group_size > 1) THEN
+      IF (pw_grid%para%rs_group%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
          pw_grid%para%mode = PW_MODE_LOCAL
@@ -335,11 +334,10 @@ CONTAINS
 
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm)
-      pw_grid%para%group_size = pw_grid%para%group%num_pe
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
          (pw_grid%para%group_head_id == pw_grid%para%group%mepos)
-      IF (pw_grid%para%group_size > 1) THEN
+      IF (mp_comm%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
          pw_grid%para%mode = PW_MODE_LOCAL
@@ -716,7 +714,7 @@ CONTAINS
          n(2) = pw_grid%ngpts_local
          CALL pw_grid%para%group%sum(n(1:2))
          n(3) = SUM(pw_grid%para%nyzray)
-         rv(:, 1) = REAL(n, KIND=dp)/REAL(pw_grid%para%group_size, KIND=dp)
+         rv(:, 1) = REAL(n, KIND=dp)/REAL(pw_grid%para%rs_group%num_pe, KIND=dp)
          n(1) = pw_grid%ngpts_cut_local
          n(2) = pw_grid%ngpts_local
          CALL pw_grid%para%group%max(n(1:2))
@@ -736,7 +734,7 @@ CONTAINS
                   " PW_GRID| Number of the reference grid ", pw_grid%reference
             END IF
             WRITE (info, '(A,T60,I10,A)') &
-               " PW_GRID| Grid distributed over ", pw_grid%para%group_size, &
+               " PW_GRID| Grid distributed over ", pw_grid%para%rs_group%num_pe, &
                " processors"
             WRITE (info, '(A,T71,2I5)') &
                " PW_GRID| Real space group dimensions ", pw_grid%para%rs_dims
@@ -853,7 +851,6 @@ CONTAINS
          pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
          CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
 
-         pw_grid%para%group_size = 1
          ALLOCATE (pw_grid%para%bo(2, 3, 0:0, 3))
          DO i = 1, 3
             pw_grid%para%bo(1, 1:3, 0, i) = 1
@@ -866,7 +863,7 @@ CONTAINS
          nx = pw_grid%npts(1)
          ny = pw_grid%npts(2)
          nz = pw_grid%npts(3)
-         np = pw_grid%para%group_size
+         np = pw_grid%para%group%num_pe
 
          ! The user can specify 2 strictly positive indices => specific layout
          !                      1 strictly positive index   => the other is fixed by the number of CPUs
@@ -1208,7 +1205,7 @@ CONTAINS
       mz = SIZE(yz_mask, 2)
 
       ! loop over all processors and all g vectors yz lines on this processor
-      DO ip = 0, ref_grid%para%group_size - 1
+      DO ip = 0, ref_grid%para%rs_group%num_pe - 1
          DO ig = 1, ref_grid%para%nyzray(ip)
             ! go from mapped coordinates to original coordinates
             ! 1, 2, ..., n-1, n -> 0, 1, ..., (n/2)-1, -(n/2), -(n/2)+1, ..., -2, -1
