@@ -336,7 +336,6 @@ CONTAINS
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm)
       pw_grid%para%group_size = pw_grid%para%group%num_pe
-      pw_grid%para%rs_group%mepos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
          (pw_grid%para%group_head_id == pw_grid%para%group%mepos)
@@ -426,7 +425,7 @@ CONTAINS
          CPABORT("BOUNDS, NPTS or CUTOFF have to be specified")
       END IF
 
-      CALL pw_grid_setup_internal(cell_hmat, cell_h_inv, cell_deth, pw_grid, bounds_local=bounds_local, &
+      CALL pw_grid_setup_internal(cell_hmat, cell_h_inv, cell_deth, pw_grid, mp_comm, bounds_local=bounds_local, &
                                   blocked=blocked, ref_grid=ref_grid, rs_dims=rs_dims, iounit=iounit)
 
 #if defined(__OFFLOAD) && !defined(__NO_OFFLOAD_PW)
@@ -520,6 +519,7 @@ CONTAINS
 !> \param cell_h_inv ...
 !> \param cell_deth ...
 !> \param pw_grid ...
+!> \param mp_comm ...
 !> \param bounds_local ...
 !> \param blocked ...
 !> \param ref_grid ...
@@ -539,11 +539,13 @@ CONTAINS
 !> \note
 !>      this is the function that should be used in the future
 ! **************************************************************************************************
-   SUBROUTINE pw_grid_setup_internal(cell_hmat, cell_h_inv, cell_deth, pw_grid, bounds_local, &
+   SUBROUTINE pw_grid_setup_internal(cell_hmat, cell_h_inv, cell_deth, pw_grid, mp_comm, bounds_local, &
                                      blocked, ref_grid, rs_dims, iounit)
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: cell_hmat, cell_h_inv
       REAL(KIND=dp), INTENT(IN)                          :: cell_deth
       TYPE(pw_grid_type), INTENT(INOUT)                  :: pw_grid
+
+      CLASS(mp_comm_type), INTENT(IN) :: mp_comm
       INTEGER, DIMENSION(2, 3), INTENT(IN), OPTIONAL     :: bounds_local
       INTEGER, INTENT(in), OPTIONAL                      :: blocked
       TYPE(pw_grid_type), INTENT(in), OPTIONAL           :: ref_grid
@@ -580,7 +582,7 @@ CONTAINS
       ! the indices in yz_mask are from -n/2 .. n/2 shifted by n/2 + 1
       ! these are not mapped indices !
       ALLOCATE (yz_mask(n(2), n(3)))
-      CALL pw_grid_count(cell_h_inv, pw_grid, ecut, yz_mask)
+      CALL pw_grid_count(cell_h_inv, pw_grid, mp_comm, ecut, yz_mask)
 
       ! Check if reference grid is compatible
       IF (PRESENT(ref_grid)) THEN
@@ -846,9 +848,11 @@ CONTAINS
          pw_grid%para%rs_dims = 1
          CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
                                            pw_grid%para%rs_dims)
+
          pw_grid%para%rs_dims = pw_grid%para%rs_group%num_pe_cart
          pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
          CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
+
          pw_grid%para%group_size = 1
          ALLOCATE (pw_grid%para%bo(2, 3, 0:0, 3))
          DO i = 1, 3
@@ -931,6 +935,7 @@ CONTAINS
          !..create group for real space distribution
          CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
                                            pw_grid%para%rs_dims)
+
          pw_grid%para%rs_dims = pw_grid%para%rs_group%num_pe_cart
          pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
          CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
@@ -1370,6 +1375,7 @@ CONTAINS
 !> \brief Count total number of g vectors
 !> \param h_inv ...
 !> \param pw_grid ...
+!> \param mp_comm ...
 !> \param cutoff ...
 !> \param yz_mask ...
 !> \par History
@@ -1377,10 +1383,12 @@ CONTAINS
 !> \author apsi
 !>      Christopher Mundy
 ! **************************************************************************************************
-   SUBROUTINE pw_grid_count(h_inv, pw_grid, cutoff, yz_mask)
+   SUBROUTINE pw_grid_count(h_inv, pw_grid, mp_comm, cutoff, yz_mask)
 
       REAL(KIND=dp), DIMENSION(3, 3)                     :: h_inv
       TYPE(pw_grid_type), INTENT(INOUT)                  :: pw_grid
+
+      CLASS(mp_comm_type), INTENT(IN) :: mp_comm
       REAL(KIND=dp), INTENT(IN)                          :: cutoff
       INTEGER, DIMENSION(:, :), INTENT(OUT)              :: yz_mask
 
@@ -1405,7 +1413,7 @@ CONTAINS
             nlim(2) = n_upperlimit
          ELSE IF (pw_grid%para%mode == PW_MODE_DISTRIBUTED) THEN
             n = n_upperlimit - bounds(1, 3) + 1
-            nlim = get_limit(n, pw_grid%para%group_size, pw_grid%para%rs_group%mepos)
+            nlim = get_limit(n, mp_comm%num_pe, mp_comm%mepos)
             nlim = nlim + bounds(1, 3) - 1
          ELSE
             CPABORT("para % mode not specified")
@@ -1435,8 +1443,8 @@ CONTAINS
 
       ! number of g-vectors for grid
       IF (pw_grid%para%mode == PW_MODE_DISTRIBUTED) THEN
-         CALL pw_grid%para%group%sum(gpt)
-         CALL pw_grid%para%group%sum(yz_mask)
+         CALL mp_comm%sum(gpt)
+         CALL mp_comm%sum(yz_mask)
       END IF
       pw_grid%ngpts_cut = gpt
 
