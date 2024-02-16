@@ -844,9 +844,6 @@ CONTAINS
          CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
                                            my_rs_dims)
 
-         pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
-         CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
-
          ALLOCATE (pw_grid%para%bo(2, 3, 0:0, 3))
          DO i = 1, 3
             pw_grid%para%bo(1, 1:3, 0, i) = 1
@@ -929,17 +926,14 @@ CONTAINS
          CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
                                            my_rs_dims)
 
-         pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
-         CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
-
          IF (PRESENT(bounds_local)) THEN
             pw_grid%bounds_local = bounds_local
          ELSE
             lo = get_limit(nx, pw_grid%para%rs_group%num_pe_cart(1), &
-                           pw_grid%para%rs_pos(1))
+                           pw_grid%para%rs_group%mepos_cart(1))
             pw_grid%bounds_local(:, 1) = lo + pw_grid%bounds(1, 1) - 1
             lo = get_limit(ny, pw_grid%para%rs_group%num_pe_cart(2), &
-                           pw_grid%para%rs_pos(2))
+                           pw_grid%para%rs_group%mepos_cart(2))
             pw_grid%bounds_local(:, 2) = lo + pw_grid%bounds(1, 2) - 1
             pw_grid%bounds_local(:, 3) = pw_grid%bounds(:, 3)
          END IF
@@ -1100,7 +1094,7 @@ CONTAINS
                pw_grid%para%nyzray(ip) = n*m
             END DO
 
-            ipl = pw_grid%para%rs_mpo
+            ipl = pw_grid%para%rs_group%mepos
             l = pw_grid%para%bo(2, 1, ipl, 3) - &
                 pw_grid%para%bo(1, 1, ipl, 3) + 1
             m = pw_grid%para%bo(2, 2, ipl, 3) - &
@@ -1130,7 +1124,7 @@ CONTAINS
 
             ALLOCATE (pemap(0:np - 1))
             pemap = 0
-            pemap(pw_grid%para%rs_group%mepos) = pw_grid%para%rs_mpo
+            pemap(pw_grid%para%rs_group%mepos) = pw_grid%para%rs_group%mepos
             CALL pw_grid%para%group%sum(pemap)
 
             DO ip = 0, np - 1
@@ -1540,7 +1534,7 @@ CONTAINS
 
          ELSE
 
-            bol = pw_grid%para%bo(:, :, pw_grid%para%rs_mpo, 3)
+            bol = pw_grid%para%bo(:, :, pw_grid%para%rs_group%mepos, 3)
             gpt = 0
             DO n = bounds(1, 3), bounds(2, 3)
                IF (n < 0) THEN

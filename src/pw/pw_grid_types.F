@@ -46,7 +46,6 @@ MODULE pw_grid_types
       INTEGER, DIMENSION(:, :), ALLOCATABLE :: yzq ! local inverse pointer of yzp
       INTEGER, DIMENSION(:), ALLOCATABLE :: nyzray ! number of g-space rays (pe)
       TYPE(mp_cart_type) :: rs_group = mp_cart_type() ! real space group (2-dim cart)
-      INTEGER :: rs_mpo = -1 ! real space group position
       INTEGER, DIMENSION(2) :: rs_pos = -1 ! real space group positions in grid
       INTEGER, DIMENSION(:, :, :, :), ALLOCATABLE :: bo ! list of axis distribution
       INTEGER, DIMENSION(:), ALLOCATABLE :: pos_of_x ! what my_pos holds a given x plane....should go: hard-codes to plane distributed

@@ -769,7 +769,7 @@ CONTAINS
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:)           :: recvbuf, sendbuf, swaparray
 
    ASSOCIATE (np => pw%pw_grid%para%rs_group%num_pe, bo => pw%pw_grid%para%bo(1:2, 1:3, 0:pw%pw_grid%para%rs_group%num_pe - 1, 1), &
-                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%rs_group, mepos => pw%pw_grid%para%rs_mpo, &
+                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%rs_group, mepos => pw%pw_grid%para%rs_group%mepos, &
                  grid => rs%r)
          ALLOCATE (rcount(0:np - 1))
          DO ip = 1, np
@@ -839,7 +839,7 @@ CONTAINS
       TYPE(mp_request_type), DIMENSION(2)                :: req
 
    ASSOCIATE (np => pw%pw_grid%para%rs_group%num_pe, bo => pw%pw_grid%para%bo(1:2, 1:3, 0:pw%pw_grid%para%rs_group%num_pe - 1, 1), &
-                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%rs_group, mepos => pw%pw_grid%para%rs_mpo, &
+                 pbo => pw%pw_grid%bounds, group => pw%pw_grid%para%rs_group, mepos => pw%pw_grid%para%rs_group%mepos, &
                  grid => rs%r)
          ALLOCATE (rcount(0:np - 1))
          DO ip = 1, np
@@ -1228,7 +1228,7 @@ CONTAINS
       recv_sizes = 0
 
       my_rs_rank = rs%desc%my_pos
-      my_pw_rank = pw%pw_grid%para%rs_mpo
+      my_pw_rank = pw%pw_grid%para%rs_group%mepos
 
       ! find the processors that should hold our data
       ! should be part of the rs grid type
@@ -1496,7 +1496,7 @@ CONTAINS
       recv_sizes = 0
 
       my_rs_rank = rs%desc%my_pos
-      my_pw_rank = pw%pw_grid%para%rs_mpo
+      my_pw_rank = pw%pw_grid%para%rs_group%mepos
 
       ! find the processors that should hold our data
       ! should be part of the rs grid type

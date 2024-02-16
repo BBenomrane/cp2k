@@ -85,7 +85,7 @@ CONTAINS
 
       nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
 
-      iproc = pw_grid%para%rs_mpo
+      iproc = pw_grid%para%rs_group%mepos
 
       NULLIFY (wavelet%karray, wavelet%rho_z_sliced)
 
@@ -127,7 +127,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
       nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
-      iproc = pw_grid%para%rs_mpo
+      iproc = pw_grid%para%rs_group%mepos
       geocode = wavelet%geocode
       nx = pw_grid%npts(1)
       ny = pw_grid%npts(2)
@@ -187,7 +187,7 @@ CONTAINS
       CPASSERT(ASSOCIATED(wavelet))
 
       nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
-      iproc = pw_grid%para%rs_mpo
+      iproc = pw_grid%para%rs_group%mepos
       md2 = wavelet%PS_grid(3)
       m2 = pw_grid%npts(3)
       lb(:) = pw_grid%bounds_local(1, :)
@@ -337,7 +337,7 @@ CONTAINS
       CPASSERT(ASSOCIATED(wavelet))
 
       nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
-      iproc = pw_grid%para%rs_mpo
+      iproc = pw_grid%para%rs_group%mepos
       md2 = wavelet%PS_grid(3)
       m2 = pw_grid%npts(3)
 
@@ -455,7 +455,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
       nproc = PRODUCT(pw_grid%para%rs_group%num_pe_cart)
-      iproc = pw_grid%para%rs_mpo
+      iproc = pw_grid%para%rs_group%mepos
       geocode = wavelet%geocode
       nx = pw_grid%npts(1)
       ny = pw_grid%npts(2)
