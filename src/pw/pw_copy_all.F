@@ -58,7 +58,7 @@ CONTAINS
       pg2 => pw2%pw_grid
 
       group = pg1%para%group
-      group_size = pg1%para%group_size
+      group_size = pg1%para%rs_group%num_pe
       me = pg1%para%rs_group%mepos
       ALLOCATE (ngr(group_size))
       ngr = 0

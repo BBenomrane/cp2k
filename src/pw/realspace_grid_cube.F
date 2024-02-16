@@ -143,7 +143,7 @@ CONTAINS
 
          my_rank = pw%pw_grid%para%rs_group%mepos
          gid = pw%pw_grid%para%group
-         num_pe = pw%pw_grid%para%group_size
+         num_pe = pw%pw_grid%para%rs_group%num_pe
          tag = 1
 
          rank (1) = unit_nr
@@ -266,7 +266,7 @@ CONTAINS
       !get rs grids and parallel environment
       gid = grid%pw_grid%para%group
       my_rank = grid%pw_grid%para%rs_group%mepos
-      num_pe = grid%pw_grid%para%group_size
+      num_pe = grid%pw_grid%para%rs_group%num_pe
       tag = 1
 
       lbounds_local = grid%pw_grid%bounds_local(1, :)
@@ -403,7 +403,7 @@ CONTAINS
       !get rs grids and parallel envnment
       gid = grid%pw_grid%para%group
       my_rank = grid%pw_grid%para%rs_group%mepos
-      num_pe = grid%pw_grid%para%group_size
+      num_pe = grid%pw_grid%para%rs_group%num_pe
       tag = 1
 
       DO i = 1, 3
@@ -876,7 +876,7 @@ CONTAINS
 
       my_rank = pw%pw_grid%para%rs_group%mepos
       gid = pw%pw_grid%para%group
-      num_pe = pw%pw_grid%para%group_size
+      num_pe = pw%pw_grid%para%rs_group%num_pe
       tag = 1
 
       rank (1) = unit_nr

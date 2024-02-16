@@ -322,7 +322,7 @@ CONTAINS
 
       rs_group = pw_grid%para%rs_group
       rs_mpo = pw_grid%para%rs_mpo
-      group_size = pw_grid%para%group_size
+      group_size = pw_grid%para%rs_group%num_pe
       rs_dims = pw_grid%para%rs_dims
 
       rs_pos = pw_grid%para%rs_pos
@@ -540,7 +540,7 @@ CONTAINS
       pw_grid => pw_in%pw_grid
       rs_group = pw_grid%para%rs_group
       rs_mpo = pw_grid%para%rs_group%mepos
-      group_size = pw_grid%para%group_size
+      group_size = pw_grid%para%rs_group%num_pe
 
       bounds_local_new = pw_expanded%pw_grid%bounds_local
 
@@ -721,7 +721,7 @@ CONTAINS
       pw_grid_orig => pw_shrinked%pw_grid
       rs_group = pw_grid_orig%para%rs_group
       rs_mpo = pw_grid_orig%para%rs_group%mepos
-      group_size = pw_grid_orig%para%group_size
+      group_size = pw_grid_orig%para%rs_group%num_pe
       bounds_local_xpnd = pw_in%pw_grid%bounds_local
       tag = 1
 
@@ -1056,7 +1056,7 @@ CONTAINS
 
       rs_group = pw_grid%para%rs_group
       rs_mpo = pw_grid%para%rs_group%mepos
-      group_size = pw_grid%para%group_size
+      group_size = pw_grid%para%rs_group%num_pe
       bounds = pw_grid%bounds
       bounds_local = pw_grid%bounds_local
 
