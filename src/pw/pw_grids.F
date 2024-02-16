@@ -127,7 +127,6 @@ CONTAINS
       CALL pw_grid%para%group%from_dup(mp_comm_self)
       CALL pw_grid%para%rs_group%create(mp_comm_self, 2, pw_grid%para%rs_dims)
       pw_grid%para%group_size = pw_grid%para%group%num_pe
-      pw_grid%para%rs_group%mepos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
          (pw_grid%para%group_head_id == pw_grid%para%rs_group%mepos)
@@ -340,7 +339,7 @@ CONTAINS
       pw_grid%para%rs_group%mepos = pw_grid%para%group%mepos
       pw_grid%para%group_head_id = 0
       pw_grid%para%group_head = &
-         (pw_grid%para%group_head_id == pw_grid%para%rs_group%mepos)
+         (pw_grid%para%group_head_id == pw_grid%para%group%mepos)
       IF (pw_grid%para%group_size > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
