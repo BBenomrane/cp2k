@@ -829,7 +829,7 @@ CONTAINS
 
       offset = 0
       my_pos = v_rspace%pw_grid%para%rs_group%mepos
-      group_size = v_rspace%pw_grid%para%group_size
+      group_size = v_rspace%pw_grid%para%rs_group%num_pe
 
       DO ikind = 1, nkind
 
@@ -1030,7 +1030,7 @@ CONTAINS
 
       offset = 0
       my_pos = v_rspace%pw_grid%para%rs_group%mepos
-      group_size = v_rspace%pw_grid%para%group_size
+      group_size = v_rspace%pw_grid%para%rs_group%num_pe
 
       DO ikind = 1, nkind
 

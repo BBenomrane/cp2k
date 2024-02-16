@@ -102,7 +102,7 @@ CONTAINS
       iounit = cp_logger_get_default_io_unit(logger)
 
       my_rank = v_ee%pw_grid%para%rs_group%mepos
-      num_pe = v_ee%pw_grid%para%group_size
+      num_pe = v_ee%pw_grid%para%rs_group%num_pe
       gid = v_ee%pw_grid%para%group
       tag = 1
 

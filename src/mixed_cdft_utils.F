@@ -856,8 +856,8 @@ CONTAINS
             CALL pw_env_get(pw_env, auxbas_pw_pool=auxbas_pw_pool)
             ! work out the pw grid points each proc holds in the two (identical) parallel proc groups
             ! note we only care about the x dir since we assume the y dir is not subdivided
-            ALLOCATE (bounds(0:auxbas_pw_pool%pw_grid%para%group_size - 1, 1:2))
-            DO i = 0, auxbas_pw_pool%pw_grid%para%group_size - 1
+            ALLOCATE (bounds(0:auxbas_pw_pool%pw_grid%para%rs_group%num_pe - 1, 1:2))
+            DO i = 0, auxbas_pw_pool%pw_grid%para%rs_group%num_pe - 1
                bounds(i, 1:2) = auxbas_pw_pool%pw_grid%para%bo(1:2, 1, i, 1)
                bounds(i, 1:2) = bounds(i, 1:2) - auxbas_pw_pool%pw_grid%npts(1)/2 - 1
             END DO
@@ -865,7 +865,7 @@ CONTAINS
             ! first get the number of target procs per group
             ntargets = 0
             offset = -1
-            DO i = 0, auxbas_pw_pool%pw_grid%para%group_size - 1
+            DO i = 0, auxbas_pw_pool%pw_grid%para%rs_group%num_pe - 1
                IF ((bounds(i, 1) .GE. bo_mixed(1, 1) .AND. bounds(i, 1) .LE. bo_mixed(2, 1)) .OR. &
                    (bounds(i, 2) .GE. bo_mixed(1, 1) .AND. bounds(i, 2) .LE. bo_mixed(2, 1))) THEN
                   ntargets = ntargets + 1
@@ -893,8 +893,8 @@ CONTAINS
             ! finally determine which procs will send me grid points
             ! now we need info about y dir also
             DEALLOCATE (bounds)
-            ALLOCATE (bounds(0:pw_pools(1)%pool%pw_grid%para%group_size - 1, 1:4))
-            DO i = 0, pw_pools(1)%pool%pw_grid%para%group_size - 1
+            ALLOCATE (bounds(0:pw_pools(1)%pool%pw_grid%para%rs_group%num_pe - 1, 1:4))
+            DO i = 0, pw_pools(1)%pool%pw_grid%para%rs_group%num_pe - 1
                bounds(i, 1:2) = pw_pools(1)%pool%pw_grid%para%bo(1:2, 1, i, 1)
                bounds(i, 3:4) = pw_pools(1)%pool%pw_grid%para%bo(1:2, 2, i, 1)
                bounds(i, 1:2) = bounds(i, 1:2) - pw_pools(1)%pool%pw_grid%npts(1)/2 - 1
@@ -902,7 +902,7 @@ CONTAINS
             END DO
             ntargets = 0
             offset = -1
-            DO i = 0, pw_pools(1)%pool%pw_grid%para%group_size - 1
+            DO i = 0, pw_pools(1)%pool%pw_grid%para%rs_group%num_pe - 1
                IF ((bo(1, 1) .GE. bounds(i, 1) .AND. bo(1, 1) .LE. bounds(i, 2)) .OR. &
                    (bo(2, 1) .GE. bounds(i, 1) .AND. bo(2, 1) .LE. bounds(i, 2))) THEN
                   ntargets = ntargets + 1

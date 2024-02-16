@@ -159,8 +159,6 @@ CONTAINS
       pw_grid_out%cutoff = pw_grid_in%cutoff
 
       !para
-      pw_grid_out%para%group_size = pw_grid_out%para%group%num_pe
-      pw_grid_out%para%rs_group%mepos = pw_grid_out%para%group%mepos
       pw_grid_out%para%group_head_id = pw_grid_in%para%group_head_id
       pw_grid_out%para%group_head = &
          (pw_grid_out%para%group_head_id == pw_grid_out%para%rs_group%mepos)

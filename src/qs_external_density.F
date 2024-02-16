@@ -116,7 +116,7 @@ CONTAINS
 
          tag = 1
          ASSOCIATE (gid => rho_ext_r(1)%pw_grid%para%group, my_rank => rho_ext_r(1)%pw_grid%para%rs_group%mepos, &
-                    num_pe => rho_ext_r(1)%pw_grid%para%group_size)
+                    num_pe => rho_ext_r(1)%pw_grid%para%rs_group%num_pe)
 
             IF (dft_control%read_external_density) THEN
 
