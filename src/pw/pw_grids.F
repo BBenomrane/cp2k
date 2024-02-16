@@ -98,6 +98,8 @@ CONTAINS
       TYPE(pw_grid_type), POINTER                        :: pw_grid
       INTEGER, DIMENSION(2, 3), INTENT(IN)               :: bounds
 
+      INTEGER, DIMENSION(2)                              :: rs_dims
+
       CPASSERT(.NOT. ASSOCIATED(pw_grid))
       ALLOCATE (pw_grid)
       pw_grid%bounds = bounds
@@ -110,7 +112,6 @@ CONTAINS
       pw_grid%ngpts_cut_local = pw_grid%ngpts_local
       pw_grid%grid_span = FULLSPACE
       pw_grid%para%mode = PW_MODE_LOCAL
-      pw_grid%para%rs_dims = 1
       pw_grid%reference = 0
       pw_grid%ref_count = 1
       NULLIFY (pw_grid%g)
@@ -125,7 +126,8 @@ CONTAINS
 
       ! parallel info
       CALL pw_grid%para%group%from_dup(mp_comm_self)
-      CALL pw_grid%para%rs_group%create(mp_comm_self, 2, pw_grid%para%rs_dims)
+      rs_dims = 1
+      CALL pw_grid%para%rs_group%create(mp_comm_self, 2, rs_dims)
       IF (pw_grid%para%rs_group%num_pe > 1) THEN
          pw_grid%para%mode = PW_MODE_DISTRIBUTED
       ELSE
@@ -316,7 +318,6 @@ CONTAINS
       pw_grid%cutoff = 0.0_dp
       pw_grid%grid_span = FULLSPACE
       pw_grid%para%mode = PW_MODE_LOCAL
-      pw_grid%para%rs_dims = 0
       pw_grid%reference = 0
       pw_grid%ref_count = 1
       NULLIFY (pw_grid%g)
@@ -731,7 +732,7 @@ CONTAINS
                " PW_GRID| Grid distributed over ", pw_grid%para%rs_group%num_pe, &
                " processors"
             WRITE (info, '(A,T71,2I5)') &
-               " PW_GRID| Real space group dimensions ", pw_grid%para%rs_dims
+               " PW_GRID| Real space group dimensions ", pw_grid%para%rs_group%num_pe_cart
             IF (pw_grid%para%blocked) THEN
                WRITE (info, '(A,T78,A)') " PW_GRID| the grid is blocked: ", "YES"
             ELSE
@@ -803,6 +804,7 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: pemap
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: yz_index
       INTEGER, ALLOCATABLE, DIMENSION(:, :, :)           :: axis_dist_all
+      INTEGER, DIMENSION(2)                              :: my_rs_dims
       INTEGER, DIMENSION(2, 3)                           :: axis_dist
       LOGICAL                                            :: blocking
 
@@ -814,9 +816,10 @@ CONTAINS
       lbz = pw_grid%bounds(1, 3)
 
       pw_grid%ngpts = PRODUCT(INT(pw_grid%npts, KIND=int_8))
-      CPASSERT(ALL(pw_grid%para%rs_dims == 0))
+
+      my_rs_dims = 0
       IF (PRESENT(rs_dims)) THEN
-         pw_grid%para%rs_dims = rs_dims
+         my_rs_dims = rs_dims
       END IF
 
       IF (PRESENT(blocked)) THEN
@@ -837,11 +840,10 @@ CONTAINS
          pw_grid%ngpts_cut_local = INT(pw_grid%ngpts_cut)
          CPASSERT(pw_grid%ngpts < HUGE(pw_grid%ngpts_local))
          pw_grid%ngpts_local = INT(pw_grid%ngpts)
-         pw_grid%para%rs_dims = 1
+         my_rs_dims = 1
          CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
-                                           pw_grid%para%rs_dims)
+                                           my_rs_dims)
 
-         pw_grid%para%rs_dims = pw_grid%para%rs_group%num_pe_cart
          pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
          CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
 
@@ -868,42 +870,42 @@ CONTAINS
          ! if blocking is free:
          !                      1) blocked=.FALSE. for plane distributions
          !                      2) blocked=.TRUE.  for non-plane distributions
-         IF (ANY(pw_grid%para%rs_dims <= 0)) THEN
-            IF (ALL(pw_grid%para%rs_dims <= 0)) THEN
-               pw_grid%para%rs_dims = (/0, 0/)
+         IF (ANY(my_rs_dims <= 0)) THEN
+            IF (ALL(my_rs_dims <= 0)) THEN
+               my_rs_dims = [0, 0]
             ELSE
-               IF (pw_grid%para%rs_dims(1) > 0) THEN
-                  pw_grid%para%rs_dims(2) = np/pw_grid%para%rs_dims(1)
+               IF (my_rs_dims(1) > 0) THEN
+                  my_rs_dims(2) = np/my_rs_dims(1)
                ELSE
-                  pw_grid%para%rs_dims(1) = np/pw_grid%para%rs_dims(2)
+                  my_rs_dims(1) = np/my_rs_dims(2)
                END IF
             END IF
          END IF
          ! reset if the distribution can not be fulfilled
-         IF (PRODUCT(pw_grid%para%rs_dims) .NE. np) pw_grid%para%rs_dims = (/0, 0/)
-         ! reset if the distribution can not be dealt with (/1,np/)
-         IF (ALL(pw_grid%para%rs_dims == (/1, np/))) pw_grid%para%rs_dims = (/0, 0/)
+         IF (PRODUCT(my_rs_dims) .NE. np) my_rs_dims = [0, 0]
+         ! reset if the distribution can not be dealt with [1,np]
+         IF (ALL(my_rs_dims == [1, np])) my_rs_dims = [0, 0]
 
-         ! if (/0,0/) now, we can optimize it ourselves
-         IF (ALL(pw_grid%para%rs_dims == (/0, 0/))) THEN
+         ! if [0,0] now, we can optimize it ourselves
+         IF (ALL(my_rs_dims == [0, 0])) THEN
             ! only small grids have a chance to be 2d distributed
             IF (nx < np) THEN
                ! gives the most square looking distribution
-               CALL mp_dims_create(np, pw_grid%para%rs_dims)
+               CALL mp_dims_create(np, my_rs_dims)
                ! we tend to like the first index being smaller than the second
-               IF (pw_grid%para%rs_dims(1) > pw_grid%para%rs_dims(2)) THEN
-                  itmp = pw_grid%para%rs_dims(1)
-                  pw_grid%para%rs_dims(1) = pw_grid%para%rs_dims(2)
-                  pw_grid%para%rs_dims(2) = itmp
+               IF (my_rs_dims(1) > my_rs_dims(2)) THEN
+                  itmp = my_rs_dims(1)
+                  my_rs_dims(1) = my_rs_dims(2)
+                  my_rs_dims(2) = itmp
                END IF
                ! but should avoid having the first index 1 in all cases
-               IF (pw_grid%para%rs_dims(1) == 1) THEN
-                  itmp = pw_grid%para%rs_dims(1)
-                  pw_grid%para%rs_dims(1) = pw_grid%para%rs_dims(2)
-                  pw_grid%para%rs_dims(2) = itmp
+               IF (my_rs_dims(1) == 1) THEN
+                  itmp = my_rs_dims(1)
+                  my_rs_dims(1) = my_rs_dims(2)
+                  my_rs_dims(2) = itmp
                END IF
             ELSE
-               pw_grid%para%rs_dims = (/np, 1/)
+               my_rs_dims = [np, 1]
             END IF
          END IF
 
@@ -914,7 +916,7 @@ CONTAINS
          CASE (do_pw_grid_blocked_true)
             blocking = .TRUE.
          CASE (do_pw_grid_blocked_free)
-            IF (ALL(pw_grid%para%rs_dims == (/np, 1/))) THEN
+            IF (ALL(my_rs_dims == [np, 1])) THEN
                blocking = .FALSE.
             ELSE
                blocking = .TRUE.
@@ -925,19 +927,18 @@ CONTAINS
 
          !..create group for real space distribution
          CALL pw_grid%para%rs_group%create(pw_grid%para%group, 2, &
-                                           pw_grid%para%rs_dims)
+                                           my_rs_dims)
 
-         pw_grid%para%rs_dims = pw_grid%para%rs_group%num_pe_cart
          pw_grid%para%rs_pos = pw_grid%para%rs_group%mepos_cart
          CALL pw_grid%para%rs_group%rank_cart(pw_grid%para%rs_pos, pw_grid%para%rs_mpo)
 
          IF (PRESENT(bounds_local)) THEN
             pw_grid%bounds_local = bounds_local
          ELSE
-            lo = get_limit(nx, pw_grid%para%rs_dims(1), &
+            lo = get_limit(nx, pw_grid%para%rs_group%num_pe_cart(1), &
                            pw_grid%para%rs_pos(1))
             pw_grid%bounds_local(:, 1) = lo + pw_grid%bounds(1, 1) - 1
-            lo = get_limit(ny, pw_grid%para%rs_dims(2), &
+            lo = get_limit(ny, pw_grid%para%rs_group%num_pe_cart(2), &
                            pw_grid%para%rs_pos(2))
             pw_grid%bounds_local(:, 2) = lo + pw_grid%bounds(1, 2) - 1
             pw_grid%bounds_local(:, 3) = pw_grid%bounds(:, 3)
@@ -948,7 +949,7 @@ CONTAINS
 
          !..the third distribution is needed for the second step in the FFT
          ALLOCATE (pw_grid%para%bo(2, 3, 0:np - 1, 3))
-         rsd = pw_grid%para%rs_dims
+         rsd = pw_grid%para%rs_group%num_pe_cart
 
          IF (PRESENT(bounds_local)) THEN
             ! axis_dist tells what portion of 1 .. nx , 1 .. ny , 1 .. nz are in the current process
