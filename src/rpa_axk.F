@@ -193,7 +193,7 @@ CONTAINS
 
       ! Scale fm_work_iaP
       CALL calc_fm_mat_S_rpa(fm_mat_S, .TRUE., virtual, eig, &
-                             homo, omega, 0.0_dp)
+                             omega, 0.0_dp)
 
       ! Redistribute fm_mat_R_half for "rectangular" multiplication: ia*P P*P
       CALL cp_fm_create(fm_mat_R_half_gemm, fm_mat_Q_gemm%matrix_struct)
