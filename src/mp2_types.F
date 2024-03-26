@@ -23,7 +23,8 @@ MODULE mp2_types
    USE input_constants,                 ONLY: &
         do_eri_mme, eri_default, gw_pade_approx, kp_weights_W_auto, mp2_method_direct, &
         mp2_method_gpw, mp2_method_none, mp2_ri_optimize_basis, ri_mp2_laplace, ri_mp2_method_gpw, &
-        ri_rpa_g0w0_crossing_z_shot, ri_rpa_method_gpw, soc_none, wfc_mm_style_gemm
+        ri_rpa_g0w0_crossing_z_shot, ri_rpa_method_gpw, rpa_quadrature_cc, soc_none, &
+        wfc_mm_style_gemm
    USE input_section_types,             ONLY: section_vals_release,&
                                               section_vals_type
    USE iso_c_binding,                   ONLY: c_null_ptr,&
@@ -125,12 +126,12 @@ MODULE mp2_types
       INTEGER                                            :: rpa_num_quad_points = -1, &
                                                             rpa_num_integ_groups = -1, &
                                                             mm_style = wfc_mm_style_gemm, &
-                                                            extrapolation_order = -1
+                                                            extrapolation_order = -1, &
+                                                            rpa_quadrature = rpa_quadrature_cc
       TYPE(hfx_type), DIMENSION(:, :), POINTER           :: x_data => NULL()
       TYPE(section_vals_type), POINTER                   :: xc_section_primary => Null(), &
                                                             xc_section_aux => Null()
       LOGICAL                                            :: reuse_hfx = .FALSE., &
-                                                            minimax_quad = .FALSE., &
                                                             do_ri_g0w0 = .FALSE., &
                                                             do_admm = .FALSE., &
                                                             do_ri_axk = .FALSE., &
@@ -308,7 +309,6 @@ MODULE mp2_types
       REAL(KIND=dp), DIMENSION(3, 3)                     :: mp2_virial = 0.0_dp
       REAL(dp)                                           :: eps_canonical = 0.0_dp
       LOGICAL                                            :: free_hfx_buffer = .FALSE.
-      LOGICAL                                            :: use_old_grad = .FALSE.
       INTEGER                                            :: dot_blksize = 0
       INTEGER                                            :: max_parallel_comm = 0
    END TYPE grad_util
@@ -321,7 +321,7 @@ MODULE mp2_types
       TYPE(mp2_gpw_r3d_rs_type)                                 :: mp2_gpw = mp2_gpw_r3d_rs_type()
       TYPE(ri_mp2_type)                                  :: ri_mp2 = ri_mp2_type()
       TYPE(ri_rpa_type)                                  :: ri_rpa = ri_rpa_type()
-      ! There is a bug with some older compilers preventing requiring an explicit initialization of allocatable components
+      ! There is a bug with some older compilers requiring an explicit initialization of allocatable components
 #if __GNUC__ < 9 || (__GNUC__ == 9 && __GNUC_MINOR__ < 5)
       TYPE(ri_rpa_im_time_type)                          :: ri_rpa_im_time = ri_rpa_im_time_type(Eigenval_Gamma=NULL(), &
                                                                                                  wkp_V=NULL(), &

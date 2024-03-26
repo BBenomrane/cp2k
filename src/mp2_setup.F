@@ -106,7 +106,7 @@ CONTAINS
       CALL section_vals_val_get(mp2_section, "RI_RPA%NUM_INTEG_GROUPS", i_val=mp2_env%ri_rpa%rpa_num_integ_groups)
       CALL section_vals_val_get(mp2_section, "RI_RPA%EXTRAPOLATION_ORDER", i_val=mp2_env%ri_rpa%extrapolation_order)
       CALL section_vals_val_get(mp2_section, "RI_RPA%MM_STYLE", i_val=mp2_env%ri_rpa%mm_style)
-      CALL section_vals_val_get(mp2_section, "RI_RPA%MINIMAX_QUADRATURE", l_val=mp2_env%ri_rpa%minimax_quad)
+      CALL section_vals_val_get(mp2_section, "RI_RPA%QUADRATURE_RULE", i_val=mp2_env%ri_rpa%rpa_quadrature)
       CALL section_vals_val_get(mp2_section, "RI_RPA%ADMM", l_val=mp2_env%ri_rpa%do_admm)
       CALL section_vals_val_get(mp2_section, "RI_RPA%SCALE_RPA", r_val=mp2_env%ri_rpa%scale_rpa)
       mp2_env%ri_rpa%reuse_hfx = .FALSE.
@@ -440,7 +440,6 @@ CONTAINS
       ! Set the CPHF section
       CALL section_vals_val_get(mp2_section, "CANONICAL_GRADIENTS%FREE_HFX_BUFFER", l_val=mp2_env%ri_grad%free_hfx_buffer)
       CALL section_vals_val_get(mp2_section, "CANONICAL_GRADIENTS%EPS_CANONICAL", r_val=mp2_env%ri_grad%eps_canonical)
-      CALL section_vals_val_get(mp2_section, "CANONICAL_GRADIENTS%USE_OLD_GRADIENT_CODE", l_val=mp2_env%ri_grad%use_old_grad)
       CALL section_vals_val_get(mp2_section, "CANONICAL_GRADIENTS%DOT_PRODUCT_BLKSIZE", i_val=mp2_env%ri_grad%dot_blksize)
       CALL section_vals_val_get(mp2_section, "CANONICAL_GRADIENTS%MAX_PARALLEL_COMM", i_val=mp2_env%ri_grad%max_parallel_comm)
       cphf_section => section_vals_get_subs_vals(mp2_section, "CANONICAL_GRADIENTS%CPHF")
