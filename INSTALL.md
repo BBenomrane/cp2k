@@ -472,6 +472,16 @@ DeePMD-kit - Deep Potential Molecular Dyanmics. Support for DeePMD-kit can be en
   <https://docs.deepmodeling.com/projects/deepmd/en/master/install/install-from-c-library.html>
 - For more information see <https://github.com/deepmodeling/deepmd-kit.git>.
 
+### 2z. Fast Fourier transforms using SpFFT (optional, GPU accelerated FFTs)
+
+The SPFFT library is a hard dependency of SIRIUS but can also be used as a standalone library. It
+provides a generic interface to sparse fast Fourier transforms (FFT) including offloading on GPU.
+Offloading supports both CUDA and ROCM (see manual of SpFFT). This enables an alternative parallel
+FFT implementation than the one used in CP2K based on local 1D FFTs.
+
+To make the functionality available, add the flag `-D__SPFFT` to the `DFLAGS` variable and compile
+SPFFT with Fortran interface and, if available, GPU support. This affects all FFTs.
+
 ## 3. Compile
 
 ### 3a. ARCH files
