@@ -33,8 +33,8 @@ MODULE fftw3_lib
    IMPLICIT NONE
    PRIVATE
 
-   PUBLIC :: fftw3_do_init, fftw3_do_cleanup, fftw3_get_lengths, fftw33d, fftw31dm
-   PUBLIC :: fftw3_destroy_plan, fftw3_create_plan_1dm, fftw3_create_plan_3d
+   PUBLIC :: fftw3_do_init, fftw3_do_cleanup, fftw3_get_lengths, fftw33d, fftw3_1d
+   PUBLIC :: fftw3_destroy_plan, fftw3_create_plan_1d, fftw3_create_plan_3d
    PUBLIC :: fftw_alloc, fftw_dealloc
 
 #if defined ( __FFTW3 )
@@ -1048,7 +1048,7 @@ CONTAINS
 !> \param zout ...
 !> \param plan_style ...
 ! **************************************************************************************************
-   SUBROUTINE fftw3_create_plan_1dm(plan, zin, zout, plan_style)
+   SUBROUTINE fftw3_create_plan_1d(plan, zin, zout, plan_style)
 
       TYPE(fft_plan_type), INTENT(INOUT)              :: plan
       COMPLEX(KIND=dp), DIMENSION(*), INTENT(INOUT)         :: zin
@@ -1068,7 +1068,7 @@ CONTAINS
       CASE (4)
          fftw_plan_type = FFTW_EXHAUSTIVE
       CASE DEFAULT
-         CPABORT("fftw3_create_plan_1dm")
+         CPABORT("fftw3_create_plan_1d")
       END SELECT
 
 #if defined (__FFTW3_UNALIGNED)
@@ -1136,7 +1136,7 @@ CONTAINS
       IF (.FALSE.) THEN; DO; IF (ABS(zin(1)) > ABS(zout(1))) EXIT; END DO; END IF
 #endif
 
-   END SUBROUTINE fftw3_create_plan_1dm
+   END SUBROUTINE fftw3_create_plan_1d
 
 ! **************************************************************************************************
 !> \brief ...
@@ -1178,7 +1178,7 @@ CONTAINS
 !> \param scale ...
 !> \param stat ...
 ! **************************************************************************************************
-   SUBROUTINE fftw31dm(plan, zin, zout, scale, stat)
+   SUBROUTINE fftw3_1d(plan, zin, zout, scale, stat)
       TYPE(fft_plan_type), INTENT(IN)                    :: plan
       COMPLEX(KIND=dp), DIMENSION(*), INTENT(IN), TARGET :: zin
       COMPLEX(KIND=dp), DIMENSION(*), INTENT(INOUT), &
@@ -1250,6 +1250,6 @@ CONTAINS
 
 !$OMP END PARALLEL
 
-      END SUBROUTINE fftw31dm
+      END SUBROUTINE fftw3_1d
 
    END MODULE
