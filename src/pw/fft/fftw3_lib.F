@@ -1348,6 +1348,44 @@ CONTAINS
 
 !$OMP END PARALLEL
 
+      ! DEBUG
+      BLOCK
+         COMPLEX(KIND=dp), DIMENSION(SIZE(zin)) :: tmp
+         TYPE(fft_plan_type) :: plan_1d
+         plan_1d%trans = plan%trans
+         plan_1d%fft_in_place = .TRUE.
+         IF (fsign == FWFFT) THEN
+            plan_1d%n = plan%n_3d(2)
+            plan_1d%m = plan%n_3d(1)*plan%m
+         ELSE
+            plan_1d%n = plan%n_3d(1)
+            plan_1d%m = plan%n_3d(2)*plan%m
+         END IF
+!$       plan_1d%need_alt_plan = .FALSE.
+
+         tmp = zin
+
+         CALL fftw3_create_plan_1d(plan_1d, tmp, tmp)
+         CALL fftw3_1d(plan_1d, fsign, tmp, tmp, scale, stat)
+         CALL fftw3_destroy_plan(plan_1d)
+
+         IF (fsign == FWFFT) THEN
+            plan_1d%n = plan%n_3d(1)
+            plan_1d%m = plan%n_3d(2)*plan%m
+         ELSE
+            plan_1d%n = plan%n_3d(2)
+            plan_1d%m = plan%n_3d(1)*plan%m
+         END IF
+!$       plan_1d%need_alt_plan = .FALSE.
+
+         CALL fftw3_create_plan_1d(plan_1d, tmp, tmp)
+         CALL fftw3_1d(plan_1d, fsign, tmp, tmp, 1.0_dp, stat)
+         CALL fftw3_destroy_plan(plan_1d)
+
+         zout = tmp
+
+      END BLOCK
+
 #else
       MARK_USED(plan)
       MARK_USED(scale)
