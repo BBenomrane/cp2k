@@ -33,8 +33,8 @@ MODULE fftw3_lib
    IMPLICIT NONE
    PRIVATE
 
-   PUBLIC :: fftw3_do_init, fftw3_do_cleanup, fftw3_get_lengths, fftw3_3d, fftw3_1d
-   PUBLIC :: fftw3_destroy_plan, fftw3_create_plan_1d, fftw3_create_plan_3d
+   PUBLIC :: fftw3_do_init, fftw3_do_cleanup, fftw3_get_lengths, fftw3_3d, fftw3_2d, fftw3_1d
+   PUBLIC :: fftw3_destroy_plan, fftw3_create_plan_1d, fftw3_create_plan_2d, fftw3_create_plan_3d
    PUBLIC :: fftw_alloc, fftw_dealloc
 
    INTEGER(C_INT), SAVE :: fftw_plan_type = -1_C_INT
@@ -402,8 +402,6 @@ CONTAINS
       INTEGER                                            :: a, i, ib, ir, istack(1:nstack), itemp, &
                                                             j, jstack, k, l, temp
 
-!------------------------------------------------------------------------------
-
       DO i = 1, n
          INDEX(i) = i
       END DO
@@ -565,6 +563,7 @@ CONTAINS
       MARK_USED(zin)
       MARK_USED(zout)
       valid = .FALSE.
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 
 #endif
 
@@ -615,6 +614,7 @@ CONTAINS
 
 #else
       is_mkl = .FALSE.
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 #endif
 
    END FUNCTION
@@ -765,6 +765,7 @@ CONTAINS
             plan%fftw_plan_fw = fftw_plan_dft_3d(n3, n2, n1, zin, zout, FFTW_FORWARD, fftw_plan_type)
             plan%fftw_plan_bw = fftw_plan_dft_3d(n3, n2, n1, zin, zout, FFTW_BACKWARD, fftw_plan_type)
          END IF
+!$       CALL fftw_plan_with_nthreads(1)
       ELSE
          ALLOCATE (tmp(n1*n2*n3))
          ! ************************* PLANS WITH TRANSPOSITIONS ****************************
@@ -872,6 +873,7 @@ CONTAINS
       MARK_USED(plan)
       MARK_USED(zin)
       MARK_USED(zout)
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 #endif
 
    END SUBROUTINE fftw3_create_plan_3d
@@ -943,6 +945,7 @@ CONTAINS
       MARK_USED(ostride)
       MARK_USED(input)
       MARK_USED(output)
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 #endif
 
    END SUBROUTINE
@@ -1053,10 +1056,100 @@ CONTAINS
       MARK_USED(zin)
       MARK_USED(zout)
       stat = 0
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 
 #endif
 
    END SUBROUTINE fftw3_3d
+
+! **************************************************************************************************
+
+! **************************************************************************************************
+!> \brief ...
+!> \param plan ...
+!> \param zin ...
+!> \param zout ...
+! **************************************************************************************************
+   SUBROUTINE fftw3_create_plan_2d(plan, zin, zout)
+
+      TYPE(fft_plan_type), INTENT(INOUT)                 :: plan
+      COMPLEX(KIND=dp), DIMENSION(plan%n*plan%m), INTENT(INOUT)      :: zin, zout
+#if defined ( __FFTW3 )
+      INTEGER                                            :: ii, di, io, DO, num_threads, num_rows, n_2d(2)
+
+      num_threads = 1
+      plan%separated_plans = .FALSE.
+!$OMP PARALLEL DEFAULT(NONE), &
+!$OMP          SHARED(NUM_THREADS)
+!$OMP MASTER
+!$    num_threads = omp_get_num_threads()
+!$OMP END MASTER
+!$OMP END PARALLEL
+
+      num_rows = plan%m/num_threads
+!$    plan%num_threads_needed = num_threads
+
+! Check for number of rows less than num_threads
+!$    IF (plan%m < num_threads) THEN
+!$       num_rows = 1
+!$       plan%num_threads_needed = plan%m
+!$    END IF
+
+! Check for total number of rows not divisible by num_threads
+!$    IF (num_rows*plan%num_threads_needed .NE. plan%m) THEN
+!$       plan%need_alt_plan = .TRUE.
+!$       plan%alt_num_rows = plan%m - (plan%num_threads_needed - 1)*num_rows
+!$    END IF
+
+!$    plan%num_rows = num_rows
+      ii = 1
+      di = plan%n
+      io = 1
+      DO = plan%n
+      n_2d = plan%n_3d(1:2)
+      n_2d = plan%n_3d(2:1:-1)
+      IF (plan%trans) THEN
+         ii = plan%m
+         di = 1
+         n_2d = plan%n_3d(2:1:-1)
+         !n_2d = plan%n_3d(1:2)
+      END IF
+
+      WRITE (*, *) "DEBUG fw", n_2d, plan%n_3d, plan%m, ii, di, io, do
+      plan%fftw_plan_fw = fftw_plan_many_dft(2, n_2d, num_rows, zin, [0, 0], ii, di, &
+                                             zout, [0, 0], io, DO, FFTW_FORWARD, fftw_plan_type)
+
+!$    IF (plan%need_alt_plan) THEN
+!$       plan%alt_fftw_plan_fw = fftw_plan_many_dft(2, n_2d, plan%alt_num_rows, zin, [0, 0], ii, di, &
+!$                                                  zout, [0, 0], io, DO, FFTW_FORWARD, fftw_plan_type)
+!$    END IF
+
+      ii = 1
+      di = plan%n
+      io = 1
+      DO = plan%n
+      IF (plan%trans) THEN
+         io = plan%m
+         DO = 1
+      END IF
+
+      WRITE (*, *) "DEBUG bw", n_2d, plan%n_3d, plan%m, ii, di, io, do
+      plan%fftw_plan_bw = fftw_plan_many_dft(2, n_2d, num_rows, zout, [0, 0], ii, di, &
+                                             zin, [0, 0], io, DO, FFTW_BACKWARD, fftw_plan_type)
+
+!$    IF (plan%need_alt_plan) THEN
+!$       plan%alt_fftw_plan_bw = fftw_plan_many_dft(2, n_2d, plan%alt_num_rows, zout, [0, 0], ii, di, &
+!$                                                  zin, [0, 0], io, DO, FFTW_BACKWARD, fftw_plan_type)
+!$    END IF
+
+#else
+      MARK_USED(plan)
+      MARK_USED(zin)
+      MARK_USED(zout)
+      CPABORT("In order to use FFTW, you have to install and link against it!")
+#endif
+
+   END SUBROUTINE fftw3_create_plan_2d
 
 ! **************************************************************************************************
 
@@ -1136,6 +1229,7 @@ CONTAINS
       MARK_USED(plan)
       MARK_USED(zin)
       MARK_USED(zout)
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 #endif
 
    END SUBROUTINE fftw3_create_plan_1d
@@ -1176,9 +1270,95 @@ CONTAINS
 
 #else
       MARK_USED(plan)
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 #endif
 
    END SUBROUTINE fftw3_destroy_plan
+
+! **************************************************************************************************
+!> \brief ...
+!> \param plan ...
+!> \param zin ...
+!> \param zout ...
+!> \param scale ...
+!> \param stat ...
+! **************************************************************************************************
+   SUBROUTINE fftw3_2d(plan, fsign, zin, zout, scale, stat)
+      TYPE(fft_plan_type), INTENT(IN)                    :: plan
+      INTEGER, INTENT(IN)                                :: fsign
+      COMPLEX(KIND=dp), DIMENSION(plan%n*plan%m), INTENT(INOUT), TARGET :: zin, zout
+      REAL(KIND=dp), INTENT(IN)                          :: scale
+      INTEGER, INTENT(OUT)                               :: stat
+
+#if defined ( __FFTW3 )
+      INTEGER                                            :: in_offset, my_id, num_rows, out_offset, &
+                                                            scal_offset
+      TYPE(C_PTR)                                        :: fftw_plan
+
+      WRITE (*, *) "DEBUG execute", plan%n_3d, plan%n, plan%m, fsign
+
+      my_id = 0
+      num_rows = plan%m
+
+!$OMP PARALLEL DEFAULT(NONE), &
+!$OMP          PRIVATE(my_id,num_rows,in_offset,out_offset,scal_offset,fftw_plan), &
+!$OMP          SHARED(zin,zout,plan,scale,stat,fsign)
+!$    my_id = omp_get_thread_num()
+
+!$    if (my_id < plan%num_threads_needed) then
+
+         IF (fsign == FWFFT) THEN
+            fftw_plan = plan%fftw_plan_fw
+         ELSE
+            fftw_plan = plan%fftw_plan_bw
+         END IF
+
+         in_offset = 1
+         out_offset = 1
+         scal_offset = 1
+
+!$       in_offset = 1 + plan%num_rows*my_id*plan%n
+!$       out_offset = 1 + plan%num_rows*my_id*plan%n
+!$       IF (fsign == FWFFT .AND. plan%trans) THEN
+!$          in_offset = 1 + plan%num_rows*my_id
+!$       ELSEIF (fsign == BWFFT .AND. plan%trans) THEN
+!$          out_offset = 1 + plan%num_rows*my_id
+!$       END IF
+!$       scal_offset = 1 + plan%n*plan%num_rows*my_id
+!$       IF (plan%need_alt_plan .AND. my_id .EQ. plan%num_threads_needed - 1) THEN
+!$          num_rows = plan%alt_num_rows
+!$          IF (fsign == FWFFT) THEN
+!$             fftw_plan = plan%alt_fftw_plan_fw
+!$          ELSE
+!$             fftw_plan = plan%alt_fftw_plan_bw
+!$          END IF
+!$       ELSE
+!$          num_rows = plan%num_rows
+!$       END IF
+!$OMP MASTER
+         stat = 1
+!$OMP END MASTER
+         CALL fftw_execute_dft(fftw_plan, zin(in_offset:in_offset), zout(out_offset:out_offset))
+!$    end if
+! all theads need to meet at this barrier
+!$OMP BARRIER
+!$    if (my_id < plan%num_threads_needed) then
+         IF (scale /= 1.0_dp) CALL zdscal(plan%n*num_rows, scale, zout(scal_offset:scal_offset), 1)
+!$    end if
+
+!$OMP END PARALLEL
+
+#else
+      MARK_USED(plan)
+      MARK_USED(scale)
+      MARK_USED(zin)
+      MARK_USED(zout)
+      stat = 0
+      CPABORT("In order to use FFTW, you have to install and link against it!")
+
+#endif
+
+   END SUBROUTINE fftw3_2d
 
 ! **************************************************************************************************
 !> \brief ...
@@ -1195,11 +1375,10 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: scale
       INTEGER, INTENT(OUT)                               :: stat
 
+#if defined ( __FFTW3 )
       INTEGER                                            :: in_offset, my_id, num_rows, out_offset, &
                                                             scal_offset
       TYPE(C_PTR)                                        :: fftw_plan
-
-!------------------------------------------------------------------------------
 
       my_id = 0
       num_rows = plan%m
@@ -1240,7 +1419,6 @@ CONTAINS
 !$          num_rows = plan%num_rows
 !$       END IF
 
-#if defined ( __FFTW3 )
 !$OMP MASTER
          stat = 1
 !$OMP END MASTER
@@ -1252,20 +1430,18 @@ CONTAINS
          IF (scale /= 1.0_dp) CALL zdscal(plan%n*num_rows, scale, zout(scal_offset:scal_offset), 1)
 !$    end if
 
+!$OMP END PARALLEL
+
 #else
       MARK_USED(plan)
       MARK_USED(scale)
       MARK_USED(zin)
       MARK_USED(zout)
       stat = 0
-
-!$    else
-!$    end if
+      CPABORT("In order to use FFTW, you have to install and link against it!")
 
 #endif
 
-!$OMP END PARALLEL
+   END SUBROUTINE fftw3_1d
 
-      END SUBROUTINE fftw3_1d
-
-   END MODULE
+END MODULE
